@@ -36,7 +36,7 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 4px 8px;
+        padding: 0px 0px 0px 8px;
         flex-shrink: 0;
         user-select: none;
         overflow-x: auto;
@@ -55,7 +55,8 @@
         padding: 2px 2px 2px 8px;
         background: var(--jte-toolbar-hover, #333);
         border: 1px solid var(--jte-border, #444);
-        border-radius: 4px;
+        border-top: 0px solid var(--jte-border, #444);
+        border-radius: 0px 0px 4px 4px;
         color: var(--jte-status-fg, #888);
         cursor: pointer;
         font-family: var(--jte-ui-font, system-ui, -apple-system, sans-serif);
@@ -73,7 +74,7 @@
     }
 
     .jte-tab-pill.active {
-        background: var(--jte-accent, #569cd6);
+        background: var(--jte-accent, #4488d6);
         border-color: var(--jte-accent, #569cd6);
         color: #fff;
     }

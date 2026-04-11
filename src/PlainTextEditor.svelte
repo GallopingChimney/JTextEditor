@@ -405,7 +405,7 @@
     }
 
     .jte-gutter {
-        padding: 8px 0;
+        padding: 8px 8px;
         background: var(--jte-bg, #1e1e1e);
         border-right: 1px solid var(--jte-border, #333);
         overflow: hidden;

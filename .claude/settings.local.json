@@ -9,7 +9,11 @@
       "Bash(npm init:*)",
       "Bash(netstat -ano)",
       "Bash(xargs -I{} taskkill //PID {} //F)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:tiptap.dev)",
+      "WebFetch(domain:prosemirror.net)"
     ]
   }
 }

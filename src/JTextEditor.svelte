@@ -236,7 +236,7 @@
                 {findAction}
                 onchange={handleChange}
                 oncursor={handleCursor}
-                onmatchchange={(idx) => currentMatchIdx = idx}
+                onmatchchange={(idx) => (currentMatchIdx = idx)}
             />
         </div>
 
@@ -294,12 +294,13 @@
 
     .jte-bottom {
         display: flex;
-        align-items: center;
+        align-items: top;
         justify-content: space-between;
-        padding: 0px 8px;
+        padding: 0px 8px 0px 0px;
         background: var(--jte-toolbar-bg, #1e1e1e);
         border-top: 1px solid var(--jte-border, #333);
         flex-shrink: 0;
+        height: 24px;
         gap: 0px;
     }
 
@@ -333,7 +334,9 @@
         scrollbar-width: none;
     }
 
-    .jte-lang-select::-webkit-scrollbar { display: none; }
+    .jte-lang-select::-webkit-scrollbar {
+        display: none;
+    }
 
     .jte-lang-select:hover {
         color: var(--jte-toolbar-fg, #ccc);
