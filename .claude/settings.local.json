@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(xargs -I{} sh -c 'echo -n \"{}: \" && wc -c < \"{}\"')",
+      "Bash(npm init:*)",
+      "Bash(netstat -ano)",
+      "Bash(xargs -I{} taskkill //PID {} //F)",
+      "Bash(node -e ':*)"
+    ]
+  }
+}
