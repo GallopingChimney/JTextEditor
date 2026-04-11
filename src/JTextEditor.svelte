@@ -328,10 +328,12 @@
         color: var(--jte-status-fg, #888);
         font-family: var(--jte-ui-font, system-ui, sans-serif);
         font-size: 11px;
-
         cursor: pointer;
         outline: none;
+        scrollbar-width: none;
     }
+
+    .jte-lang-select::-webkit-scrollbar { display: none; }
 
     .jte-lang-select:hover {
         color: var(--jte-toolbar-fg, #ccc);

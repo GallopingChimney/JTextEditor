@@ -1,7 +1,8 @@
 ---
 name: test-editor
 description: Start the JTextEditor dev server for testing. Kills stale Vite processes, runs a build check, then starts fresh.
-user_invocable: true
+user-invocable: true
+allowed-tools: Read, Bash, Glob
 ---
 
 # Test Editor

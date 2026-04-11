@@ -1,8 +1,9 @@
 ---
 name: trace-feature
 description: Trace the full data flow of a JTextEditor feature — state ownership, props, callbacks, CSS, and event handlers.
-user_invocable: true
-args: feature_name
+user-invocable: true
+argument-hint: [feature name, e.g. find-replace, tabs, syntax-highlighting]
+allowed-tools: Read, Grep, Glob
 ---
 
 # Trace Feature
