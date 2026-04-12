@@ -1,4 +1,4 @@
-import { lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor, keymap } from "@codemirror/view";
+import { lineNumbers, highlightActiveLine, highlightActiveLineGutter, keymap } from "@codemirror/view";
 import { EditorView } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
@@ -22,12 +22,9 @@ export function jteSetup({
         jteThemeExtension,
         // Core editing
         history(),
-        drawSelection(),
         indentOnInput(),
         bracketMatching(),
         closeBrackets(),
-        rectangularSelection(),
-        crosshairCursor(),
         // Custom search panel matching JTE FindBar design
         search({ createPanel: createJteSearchPanel, top: true }),
         // Keymaps

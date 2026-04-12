@@ -13,7 +13,10 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:tiptap.dev)",
-      "WebFetch(domain:prosemirror.net)"
+      "WebFetch(domain:prosemirror.net)",
+      "Skill(tiptap)",
+      "Skill(tiptap:*)",
+      "Bash(ls -la assets/*.js)"
     ]
   }
 }

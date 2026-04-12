@@ -1,0 +1,647 @@
+<script>
+	let { editor, pinned = false, onpin, tick = 0 } = $props();
+
+	const fontSizes = ["8px", "10px", "12px", "14px", "18px", "24px", "48px", "96px"];
+	const fontFamilies = [
+		{ label: "Sans Serif", value: "system-ui, -apple-system, sans-serif" },
+		{ label: "Serif", value: 'Georgia, "Times New Roman", serif' },
+		{ label: "Mono", value: '"Cascadia Code", Consolas, monospace' },
+		{ label: "Arial", value: "Arial, Helvetica, sans-serif" },
+		{ label: "Georgia", value: "Georgia, serif" },
+		{ label: "Verdana", value: "Verdana, Geneva, sans-serif" },
+	];
+
+	let openPopup = $state(null);
+	let colorInput = $state();
+	let highlightInput = $state();
+	let overflowOpen = $state(false);
+	let toolbarEl = $state();
+
+	function closeAll() { openPopup = null; overflowOpen = false; }
+	function closePopups() { openPopup = null; }
+	function togglePopup(name) { openPopup = openPopup === name ? null : name; }
+
+	// Reactive editor state — recomputed on every transaction via tick dependency
+	let state = $derived.by(() => {
+		tick;
+		if (!editor) return {};
+		return {
+			bold: editor.isActive('bold'),
+			italic: editor.isActive('italic'),
+			underline: editor.isActive('underline'),
+			strike: editor.isActive('strike'),
+			link: editor.isActive('link'),
+			highlight: editor.isActive('highlight'),
+			code: editor.isActive('code'),
+			blockquote: editor.isActive('blockquote'),
+			bulletList: editor.isActive('bulletList'),
+			orderedList: editor.isActive('orderedList'),
+			table: editor.isActive('table'),
+			heading: editor.isActive('heading'),
+			heading1: editor.isActive('heading', { level: 1 }),
+			heading2: editor.isActive('heading', { level: 2 }),
+			heading3: editor.isActive('heading', { level: 3 }),
+			alignLeft: editor.isActive({ textAlign: 'left' }),
+			alignCenter: editor.isActive({ textAlign: 'center' }),
+			alignRight: editor.isActive({ textAlign: 'right' }),
+			alignJustify: editor.isActive({ textAlign: 'justify' }),
+			fontSize: editor.getAttributes('textStyle')?.fontSize || '',
+			fontFamily: editor.getAttributes('textStyle')?.fontFamily || '',
+			color: editor.getAttributes('textStyle')?.color || '#d4d4d4',
+			canMerge: editor.isActive('table') && editor.can().mergeCells(),
+			canSplit: editor.isActive('table') && editor.can().splitCell(),
+		};
+	});
+
+	let headingIcon = $derived(
+		state.heading1 ? 'format_h1' :
+		state.heading2 ? 'format_h2' :
+		state.heading3 ? 'format_h3' :
+		'format_paragraph'
+	);
+
+	let fontSizeNum = $derived(parseInt(state.fontSize) || 15);
+
+	function toggleMark(name) {
+		editor?.chain().focus().toggleMark(name).run();
+	}
+
+	function setAlign(align) {
+		editor?.chain().focus().setTextAlign(align).run();
+	}
+
+	function setFontSize(size) {
+		editor?.chain().focus().setFontSize(size).run();
+		closePopups();
+	}
+
+	function setFontFamily(value) {
+		if (!value) editor?.chain().focus().unsetFontFamily().run();
+		else editor?.chain().focus().setFontFamily(value).run();
+		closePopups();
+	}
+
+	function toggleList(type) {
+		if (type === "bullet") editor?.chain().focus().toggleBulletList().run();
+		else editor?.chain().focus().toggleOrderedList().run();
+	}
+
+	function setHeading(level) {
+		if (level === 0) editor?.chain().focus().setParagraph().run();
+		else editor?.chain().focus().toggleHeading({ level }).run();
+		closePopups();
+	}
+
+	function tableAction(action) {
+		const chain = editor?.chain().focus();
+		if (!chain) return;
+		switch (action) {
+			case "addRowAbove": chain.addRowBefore().run(); break;
+			case "addRowBelow": chain.addRowAfter().run(); break;
+			case "deleteRow": chain.deleteRow().run(); break;
+			case "addColLeft": chain.addColumnBefore().run(); break;
+			case "addColRight": chain.addColumnAfter().run(); break;
+			case "deleteCol": chain.deleteColumn().run(); break;
+			case "mergeCells": chain.mergeCells().run(); break;
+			case "splitCell": chain.splitCell().run(); break;
+			case "deleteTable": chain.deleteTable().run(); break;
+		}
+		closePopups();
+	}
+
+	function openColorPicker() {
+		colorInput?.click();
+	}
+
+	function applyColor(e) {
+		editor?.chain().focus().setColor(e.target.value).run();
+	}
+
+	function openHighlightPicker() {
+		highlightInput?.click();
+	}
+
+	function applyHighlightColor(e) {
+		editor?.chain().focus().toggleHighlight({ color: e.target.value }).run();
+	}
+
+	function insertTable() {
+		editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+	}
+
+	function insertImage() {
+		const url = prompt("Image URL:");
+		if (url) {
+			editor?.chain().focus().setImage({ src: url }).run();
+		}
+	}
+
+	function setLink() {
+		if (state.link) {
+			editor?.chain().focus().unsetLink().run();
+			return;
+		}
+		const url = prompt("URL:");
+		if (url) {
+			editor?.chain().focus().setLink({ href: url }).run();
+		}
+	}
+
+	function handlePopupClick(e) {
+		e.stopPropagation();
+	}
+
+	function commitFontSize(raw) {
+		let n = parseInt(raw);
+		if (!n || n < 1) return;
+		if (n > 999) n = 999;
+		editor?.chain().focus().setFontSize(n + "px").run();
+	}
+
+	function handleFontSizeKey(e) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			commitFontSize(e.target.value);
+		} else if (e.key === "Escape") {
+			e.target.blur();
+			editor?.commands.focus();
+		}
+	}
+
+	function handleFontSizeBlur(e) {
+		const v = e.target.value.trim();
+		if (v) commitFontSize(v);
+	}
+
+	// Close all dropdowns on mousedown outside toolbar
+	$effect(() => {
+		if (!toolbarEl) return;
+		function onMouseDown(e) {
+			if (!toolbarEl.contains(e.target)) closeAll();
+		}
+		document.addEventListener("mousedown", onMouseDown, true);
+		return () => document.removeEventListener("mousedown", onMouseDown, true);
+	});
+
+	// Responsive: collapse alignment + block tools into overflow when toolbar is narrow
+	let toolbarWidth = $state(Infinity);
+	let needsOverflow = $derived(toolbarWidth < 620);
+
+	$effect(() => {
+		if (!toolbarEl) return;
+		const ro = new ResizeObserver((entries) => {
+			toolbarWidth = entries[0].contentRect.width;
+		});
+		ro.observe(toolbarEl);
+		return () => ro.disconnect();
+	});
+</script>
+
+{#if editor}
+	<div class="jte-bubble" class:jte-bubble-pinned={pinned} data-bubble-menu bind:this={toolbarEl}>
+		<!-- Heading dropdown -->
+		<div class="jte-bb-wrap">
+			<button class="jte-bb" title="Paragraph style" onclick={() => togglePopup("heading")}>
+				<span class="material-symbols-outlined">{headingIcon}</span>
+				<span class="material-symbols-outlined" style="font-size:12px">expand_more</span>
+			</button>
+			{#if openPopup === "heading"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown jte-bb-dd-block" onclick={handlePopupClick}>
+					<button class="jte-bb-dd-item" class:active={!state.heading} onclick={() => setHeading(0)} style="font-size:13px">Paragraph</button>
+					<button class="jte-bb-dd-item" class:active={state.heading1} onclick={() => setHeading(1)} style="font-size:20px;font-weight:bold">Heading 1</button>
+					<button class="jte-bb-dd-item" class:active={state.heading2} onclick={() => setHeading(2)} style="font-size:16px;font-weight:bold">Heading 2</button>
+					<button class="jte-bb-dd-item" class:active={state.heading3} onclick={() => setHeading(3)} style="font-size:14px;font-weight:600">Heading 3</button>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Font family dropdown -->
+		<div class="jte-bb-wrap">
+			<button class="jte-bb" title="Font family" onclick={() => togglePopup("fontFamily")}>
+				<span class="material-symbols-outlined">font_download</span>
+				<span class="material-symbols-outlined" style="font-size:12px">expand_more</span>
+			</button>
+			{#if openPopup === "fontFamily"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown" onclick={handlePopupClick}>
+					<button
+						class="jte-bb-dd-item"
+						class:active={!state.fontFamily}
+						onclick={() => setFontFamily(null)}
+					>Default</button>
+					{#each fontFamilies as ff}
+						<button
+							class="jte-bb-dd-item"
+							class:active={state.fontFamily === ff.value}
+							style="font-family:{ff.value}"
+							onclick={() => setFontFamily(ff.value)}
+						>{ff.label}</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Font size: input + dropdown arrow -->
+		<div class="jte-bb-wrap jte-bb-split">
+			<input
+				class="jte-bb-size-input"
+				type="text"
+				title="Font Size"
+				value={fontSizeNum}
+				onkeydown={handleFontSizeKey}
+				onblur={handleFontSizeBlur}
+				onfocus={(e) => e.target.select()}
+			/>
+			<button class="jte-bb jte-bb-split-arrow" title="Font Size" onclick={() => togglePopup("fontSize")}>
+				<span class="material-symbols-outlined" style="font-size:12px">expand_more</span>
+			</button>
+			{#if openPopup === "fontSize"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown" onclick={(e) => e.stopPropagation()}>
+					{#each fontSizes as size}
+						<button
+							class="jte-bb-dd-item"
+							class:active={state.fontSize === size}
+							onclick={() => setFontSize(size)}
+						>{size}</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<span class="jte-bb-sep"></span>
+
+		<!-- Inline marks + link -->
+		<button class="jte-bb" class:active={state.bold} title="Bold (Ctrl+B)" onclick={() => toggleMark("bold")}>
+			<span class="material-symbols-outlined">format_bold</span>
+		</button>
+		<button class="jte-bb" class:active={state.italic} title="Italic (Ctrl+I)" onclick={() => toggleMark("italic")}>
+			<span class="material-symbols-outlined">format_italic</span>
+		</button>
+		<button class="jte-bb" class:active={state.underline} title="Underline (Ctrl+U)" onclick={() => toggleMark("underline")}>
+			<span class="material-symbols-outlined">format_underlined</span>
+		</button>
+		<button class="jte-bb" class:active={state.strike} title="Strikethrough" onclick={() => toggleMark("strike")}>
+			<span class="material-symbols-outlined">strikethrough_s</span>
+		</button>
+		<button class="jte-bb" class:active={state.link} title="Link" onclick={setLink}>
+			<span class="material-symbols-outlined">link</span>
+		</button>
+
+		<span class="jte-bb-sep"></span>
+
+		<!-- Text color + highlight -->
+		<div class="jte-bb-wrap">
+			<button class="jte-bb jte-bb-color-btn" title="Text Color" onclick={openColorPicker}>
+				<span class="material-symbols-outlined">format_color_text</span>
+				<span class="jte-bb-color-bar" style="background:{state.color}"></span>
+			</button>
+			<input
+				type="color"
+				bind:this={colorInput}
+				value={state.color}
+				oninput={applyColor}
+				class="jte-bb-color-input"
+			/>
+		</div>
+		<div class="jte-bb-wrap">
+			<button class="jte-bb" class:active={state.highlight} title="Highlight" onclick={openHighlightPicker}>
+				<span class="material-symbols-outlined">format_ink_highlighter</span>
+			</button>
+			<input
+				type="color"
+				bind:this={highlightInput}
+				value="#ffcc00"
+				oninput={applyHighlightColor}
+				class="jte-bb-color-input"
+			/>
+		</div>
+
+		<span class="jte-bb-sep"></span>
+
+		<!-- Alignment -->
+		<button class="jte-bb" class:active={state.alignLeft} title="Align Left" onclick={() => setAlign("left")}>
+			<span class="material-symbols-outlined">format_align_left</span>
+		</button>
+		<button class="jte-bb" class:active={state.alignCenter} title="Align Center" onclick={() => setAlign("center")}>
+			<span class="material-symbols-outlined">format_align_center</span>
+		</button>
+		<button class="jte-bb" class:active={state.alignRight} title="Align Right" onclick={() => setAlign("right")}>
+			<span class="material-symbols-outlined">format_align_right</span>
+		</button>
+		<button class="jte-bb" class:active={state.alignJustify} title="Justify" onclick={() => setAlign("justify")}>
+			<span class="material-symbols-outlined">format_align_justify</span>
+		</button>
+
+		<span class="jte-bb-sep"></span>
+
+		<!-- Lists + block tools — collapse when narrow -->
+		{#if needsOverflow}
+			<div class="jte-bb-wrap">
+				<button class="jte-bb jte-bb-overflow-btn" title="More formatting" onclick={() => { overflowOpen = !overflowOpen; }}>
+					<span class="material-symbols-outlined">more_horiz</span>
+				</button>
+				{#if overflowOpen}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="jte-bb-dropdown jte-bb-dropdown-right jte-bb-overflow-panel" onclick={handlePopupClick}>
+						<div class="jte-bb-overflow-row">
+							<button class="jte-bb" class:active={state.bulletList} title="Bullet List" onclick={() => toggleList("bullet")}>
+								<span class="material-symbols-outlined">format_list_bulleted</span>
+							</button>
+							<button class="jte-bb" class:active={state.orderedList} title="Ordered List" onclick={() => toggleList("ordered")}>
+								<span class="material-symbols-outlined">format_list_numbered</span>
+							</button>
+						</div>
+						<div class="jte-bb-dd-sep"></div>
+						<button class="jte-bb-dd-item" class:active={state.code} onclick={() => toggleMark("code")}>
+							<span class="material-symbols-outlined" style="font-size:16px">code</span> Inline Code
+						</button>
+						<button class="jte-bb-dd-item" class:active={state.blockquote} onclick={() => { editor?.chain().focus().toggleBlockquote().run(); overflowOpen = false; }}>
+							<span class="material-symbols-outlined" style="font-size:16px">format_quote</span> Blockquote
+						</button>
+						<button class="jte-bb-dd-item" onclick={() => { editor?.chain().focus().toggleCodeBlock().run(); overflowOpen = false; }}>
+							<span class="material-symbols-outlined" style="font-size:16px">code_blocks</span> Code Block
+						</button>
+						<button class="jte-bb-dd-item" onclick={() => { editor?.chain().focus().setHorizontalRule().run(); overflowOpen = false; }}>
+							<span class="material-symbols-outlined" style="font-size:16px">horizontal_rule</span> Divider
+						</button>
+						<div class="jte-bb-dd-sep"></div>
+						<button class="jte-bb-dd-item" onclick={() => { insertTable(); overflowOpen = false; }}>
+							<span class="material-symbols-outlined" style="font-size:16px">table_chart</span> Table
+						</button>
+						<button class="jte-bb-dd-item" onclick={() => { insertImage(); overflowOpen = false; }}>
+							<span class="material-symbols-outlined" style="font-size:16px">image</span> Image
+						</button>
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<button class="jte-bb" class:active={state.bulletList} title="Bullet List" onclick={() => toggleList("bullet")}>
+				<span class="material-symbols-outlined">format_list_bulleted</span>
+			</button>
+			<button class="jte-bb" class:active={state.orderedList} title="Ordered List" onclick={() => toggleList("ordered")}>
+				<span class="material-symbols-outlined">format_list_numbered</span>
+			</button>
+			<button class="jte-bb" class:active={state.code} title="Inline Code" onclick={() => toggleMark("code")}>
+				<span class="material-symbols-outlined">code</span>
+			</button>
+			<button class="jte-bb" class:active={state.blockquote} title="Blockquote" onclick={() => editor?.chain().focus().toggleBlockquote().run()}>
+				<span class="material-symbols-outlined">format_quote</span>
+			</button>
+			<button class="jte-bb" title="Code Block" onclick={() => editor?.chain().focus().toggleCodeBlock().run()}>
+				<span class="material-symbols-outlined">code_blocks</span>
+			</button>
+			<button class="jte-bb" title="Divider" onclick={() => editor?.chain().focus().setHorizontalRule().run()}>
+				<span class="material-symbols-outlined">horizontal_rule</span>
+			</button>
+			<button class="jte-bb" title="Insert Table" onclick={insertTable}>
+				<span class="material-symbols-outlined">table_chart</span>
+			</button>
+			<button class="jte-bb" title="Insert Image" onclick={insertImage}>
+				<span class="material-symbols-outlined">image</span>
+			</button>
+		{/if}
+
+		<!-- Table tools (conditional) -->
+		{#if state.table}
+			<span class="jte-bb-sep"></span>
+			<div class="jte-bb-wrap">
+				<button class="jte-bb" title="Table" onclick={() => togglePopup("table")}>
+					<span class="material-symbols-outlined">table_chart</span>
+					<span class="material-symbols-outlined" style="font-size:12px">expand_more</span>
+				</button>
+				{#if openPopup === "table"}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="jte-bb-dropdown jte-bb-dropdown-right" onclick={handlePopupClick}>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("addRowAbove")}>Insert Row Above</button>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("addRowBelow")}>Insert Row Below</button>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("deleteRow")}>Delete Row</button>
+						<div class="jte-bb-dd-sep"></div>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("addColLeft")}>Insert Column Left</button>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("addColRight")}>Insert Column Right</button>
+						<button class="jte-bb-dd-item" onclick={() => tableAction("deleteCol")}>Delete Column</button>
+						{#if state.canMerge}
+							<div class="jte-bb-dd-sep"></div>
+							<button class="jte-bb-dd-item" onclick={() => tableAction("mergeCells")}>Merge Cells</button>
+						{/if}
+						{#if state.canSplit}
+							{#if !state.canMerge}<div class="jte-bb-dd-sep"></div>{/if}
+							<button class="jte-bb-dd-item" onclick={() => tableAction("splitCell")}>Split Cell</button>
+						{/if}
+						<div class="jte-bb-dd-sep"></div>
+						<button class="jte-bb-dd-item jte-bb-dd-danger" onclick={() => tableAction("deleteTable")}>Delete Table</button>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Pin toggle -->
+		<button class="jte-bb jte-bb-pin" class:active={pinned} title={pinned ? "Unpin toolbar" : "Pin toolbar"} onclick={() => onpin?.()}>
+			<span class="material-symbols-outlined">push_pin</span>
+		</button>
+	</div>
+{/if}
+
+<style>
+	.jte-bubble {
+		display: flex;
+		align-items: center;
+		gap: 1px;
+		padding: 3px 4px;
+		background: var(--jte-menubar-bg, #2a2a2a);
+		border: 1px solid var(--jte-border, #444);
+		border-radius: 6px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+		user-select: none;
+	}
+
+	.jte-bubble-pinned {
+		border-radius: 0;
+		box-shadow: none;
+		border: none;
+		border-bottom: 1px solid var(--jte-border, #444);
+		padding: 2px 6px;
+		flex-wrap: nowrap;
+		justify-content: center;
+		position: relative;
+	}
+
+	.jte-bubble-pinned .jte-bb-pin {
+		position: absolute;
+		right: 6px;
+		top: 50%;
+		transform: translateY(-50%);
+	}
+
+	.jte-bb {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		background: transparent;
+		border: none;
+		color: var(--jte-toolbar-fg, #aaa);
+		padding: 4px 5px;
+		cursor: pointer;
+		border-radius: 4px;
+		line-height: 1;
+		flex-shrink: 0;
+	}
+
+	.jte-bb:hover {
+		background: var(--jte-toolbar-hover, #3a3a3a);
+		color: var(--jte-fg, #d4d4d4);
+	}
+
+	.jte-bb.active {
+		color: var(--jte-accent, #569cd6);
+		background: rgba(86, 156, 214, 0.12);
+	}
+
+	.jte-bb .material-symbols-outlined {
+		font-size: 16px;
+	}
+
+	.jte-bb-sep {
+		width: 1px;
+		height: 16px;
+		background: var(--jte-border, #444);
+		margin: 0 2px;
+		flex-shrink: 0;
+	}
+
+	.jte-bb-wrap {
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.jte-bb-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		min-width: 70px;
+		background: var(--jte-menubar-bg, #2a2a2a);
+		border: 1px solid var(--jte-border, #444);
+		border-radius: 6px;
+		padding: 4px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+		z-index: 100;
+	}
+
+	.jte-bb-dd-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 4px 8px;
+		background: transparent;
+		border: none;
+		color: var(--jte-toolbar-fg, #ccc);
+		cursor: pointer;
+		font-family: var(--jte-ui-font, system-ui, sans-serif);
+		font-size: 12px;
+		text-align: left;
+		border-radius: 3px;
+		white-space: nowrap;
+	}
+
+	.jte-bb-dd-item:hover {
+		background: var(--jte-toolbar-hover, #3a3a3a);
+	}
+
+	.jte-bb-dd-item.active {
+		color: var(--jte-accent, #569cd6);
+	}
+
+	.jte-bb-dd-block {
+		min-width: 140px;
+	}
+
+	.jte-bb-dropdown-right {
+		right: 0;
+		left: auto;
+	}
+
+	.jte-bb-dd-sep {
+		height: 1px;
+		background: var(--jte-border, #444);
+		margin: 3px 0;
+	}
+
+	.jte-bb-dd-danger {
+		color: #e06c75;
+	}
+
+	.jte-bb-dd-danger:hover {
+		background: rgba(224, 108, 117, 0.12);
+	}
+
+	.jte-bb-color-input {
+		position: absolute;
+		width: 0;
+		height: 0;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	/* Text color button with indicator bar */
+	.jte-bb-color-btn {
+		position: relative;
+	}
+
+	.jte-bb-color-bar {
+		position: absolute;
+		bottom: 2px;
+		left: 4px;
+		right: 4px;
+		height: 2px;
+		border-radius: 1px;
+	}
+
+	/* Overflow panel */
+	.jte-bb-overflow-panel {
+		min-width: 150px;
+	}
+
+	.jte-bb-overflow-row {
+		display: flex;
+		align-items: center;
+		gap: 1px;
+		padding: 2px 0;
+	}
+
+	/* Font size split: input + arrow */
+	.jte-bb-split {
+		display: flex;
+		align-items: center;
+	}
+
+	.jte-bb-size-input {
+		width: 30px;
+		padding: 3px 2px 3px 5px;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 4px 0 0 4px;
+		color: var(--jte-toolbar-fg, #aaa);
+		font-family: var(--jte-ui-font, system-ui, sans-serif);
+		font-size: 11px;
+		line-height: 1;
+		text-align: center;
+		outline: none;
+	}
+
+	.jte-bb-size-input:hover {
+		border-color: var(--jte-border, #444);
+	}
+
+	.jte-bb-size-input:focus {
+		border-color: var(--jte-accent, #569cd6);
+		color: var(--jte-fg, #d4d4d4);
+		background: var(--jte-input-focus-bg, rgba(255,255,255,0.06));
+	}
+
+	.jte-bb-split-arrow {
+		padding: 4px 2px;
+		border-radius: 0 4px 4px 0;
+	}
+</style>

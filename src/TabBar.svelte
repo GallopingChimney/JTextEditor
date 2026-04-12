@@ -11,7 +11,7 @@
             title={tab.path || tab.name}
         >
             <span class="jte-tab-name">
-                {tab.modified ? "\u2022 " : ""}{tab.name}
+                {tab.name}{#if tab.modified}<span class="jte-tab-dirty">*</span>{/if}
             </span>
             <span
                 class="jte-tab-close"
@@ -53,10 +53,9 @@
         gap: 4px;
         height: 20px;
         padding: 2px 2px 2px 8px;
-        background: var(--jte-toolbar-hover, #333);
-        border: 1px solid var(--jte-border, #444);
-        border-top: 0px solid var(--jte-border, #444);
-        border-radius: 0px 0px 4px 4px;
+        background: transparent;
+        border: none;
+        border-radius: 0px 0px 2px 2px;
         color: var(--jte-status-fg, #888);
         cursor: pointer;
         font-family: var(--jte-ui-font, system-ui, -apple-system, sans-serif);
@@ -69,14 +68,20 @@
     }
 
     .jte-tab-pill:hover {
-        background: var(--jte-toolbar-active, #444);
+        background: var(--jte-toolbar-hover, #333);
         color: var(--jte-toolbar-fg, #ccc);
     }
 
     .jte-tab-pill.active {
-        background: var(--jte-accent, #4488d6);
-        border-color: var(--jte-accent, #569cd6);
+        background: var(--jte-toolbar-hover, #333);
+        border-bottom: 2px solid var(--jte-accent, #569cd6);
         color: #fff;
+    }
+
+    .jte-tab-dirty {
+        color: #e06c75;
+        margin-left: 1px;
+        font-weight: bold;
     }
 
     .jte-tab-name {

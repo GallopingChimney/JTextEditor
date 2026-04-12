@@ -18,14 +18,8 @@ export const jteTheme = EditorView.theme(
             padding: "8px 0",
             caretColor: "var(--jte-fg, #d4d4d4)",
         },
-        ".cm-cursor, .cm-dropCursor": {
-            borderLeftColor: "var(--jte-fg, #d4d4d4)",
-        },
-        "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-        },
         ".cm-activeLine": {
-            backgroundColor: "rgba(255, 255, 255, 0.04)",
+            backgroundColor: "var(--jte-active-line, rgba(255, 255, 255, 0.04))",
         },
         ".cm-gutters": {
             backgroundColor: "var(--jte-bg, #1e1e1e)",
@@ -53,20 +47,13 @@ export const jteTheme = EditorView.theme(
         },
         // Match highlights
         ".cm-searchMatch": {
-            backgroundColor: "rgba(255, 200, 0, 0.25)",
+            backgroundColor: "var(--jte-search-match, rgba(255, 200, 0, 0.25))",
             borderRadius: "2px",
         },
         ".cm-searchMatch-selected": {
-            backgroundColor: "rgba(255, 200, 0, 0.6)",
-            outline: "1px solid rgba(255, 200, 0, 0.8)",
+            backgroundColor: "var(--jte-search-match-active, rgba(255, 200, 0, 0.6))",
+            outline: "1px solid var(--jte-search-match-active, rgba(255, 200, 0, 0.8))",
             borderRadius: "2px",
-        },
-        // Selection styling
-        "&.cm-focused .cm-selectionBackground": {
-            backgroundColor: "rgba(38, 119, 204, 0.35)",
-        },
-        ".cm-selectionBackground": {
-            backgroundColor: "rgba(38, 119, 204, 0.2)",
         },
         // FindBar panel
         ".jte-find": {
@@ -97,7 +84,10 @@ export const jteTheme = EditorView.theme(
             width: "110px",
         },
         ".jte-find-input:focus": {
-            background: "#1a1a1a",
+            background: "var(--jte-input-focus-bg, #1a1a1a)",
+        },
+        ".jte-find-input::selection": {
+            backgroundColor: "var(--jte-selection-focused, rgba(38, 119, 204, 0.35))",
         },
         ".jte-fo": {
             display: "flex",
@@ -134,8 +124,8 @@ export const jteTheme = EditorView.theme(
         },
         // Bracket matching
         "&.cm-focused .cm-matchingBracket": {
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            outline: "1px solid rgba(255, 255, 255, 0.3)",
+            backgroundColor: "var(--jte-bracket-match-bg, rgba(255, 255, 255, 0.1))",
+            outline: "1px solid var(--jte-bracket-match-border, rgba(255, 255, 255, 0.3))",
         },
         // Scrollbars
         ".cm-scroller": {
@@ -154,10 +144,10 @@ export const jteTheme = EditorView.theme(
             border: "6px solid transparent",
             backgroundClip: "padding-box",
             borderRadius: "10px",
-            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            backgroundColor: "var(--jte-scrollbar-thumb, rgba(255, 255, 255, 0.2))",
         },
         ".cm-scroller::-webkit-scrollbar-thumb:hover": {
-            backgroundColor: "rgba(255, 255, 255, 0.35)",
+            backgroundColor: "var(--jte-scrollbar-thumb-hover, rgba(255, 255, 255, 0.35))",
         },
         ".cm-scroller::-webkit-scrollbar-corner": {
             background: "transparent",
@@ -170,17 +160,17 @@ export const jteTheme = EditorView.theme(
     { dark: true },
 );
 
-/** Syntax highlight colors ported from the Prism theme */
+/** Syntax highlight colors using CSS custom properties for theme reactivity */
 export const jteHighlightStyle = HighlightStyle.define([
-    { tag: [tags.comment, tags.lineComment, tags.blockComment, tags.docComment], color: "#6a9955" },
-    { tag: tags.punctuation, color: "#ff66bb" },
-    { tag: [tags.propertyName, tags.tagName, tags.bool, tags.number, tags.atom, tags.constant(tags.variableName)], color: "#b5cea8" },
-    { tag: [tags.attributeName, tags.string, tags.character, tags.special(tags.string)], color: "#ce9178" },
-    { tag: [tags.operator, tags.url, tags.escape], color: "#d4d4d4" },
-    { tag: [tags.keyword, tags.modifier, tags.operatorKeyword, tags.controlKeyword, tags.definitionKeyword, tags.moduleKeyword], color: "#569cd6" },
-    { tag: [tags.function(tags.variableName), tags.className, tags.typeName, tags.definition(tags.typeName)], color: "#decc88" },
-    { tag: [tags.regexp, tags.variableName], color: "#d16969" },
-    { tag: tags.meta, color: "#569cd6" },
+    { tag: [tags.comment, tags.lineComment, tags.blockComment, tags.docComment], color: "var(--jte-syntax-comment, #6a9955)" },
+    { tag: tags.punctuation, color: "var(--jte-syntax-punctuation, #ff66bb)" },
+    { tag: [tags.propertyName, tags.tagName, tags.bool, tags.number, tags.atom, tags.constant(tags.variableName)], color: "var(--jte-syntax-property, #b5cea8)" },
+    { tag: [tags.attributeName, tags.string, tags.character, tags.special(tags.string)], color: "var(--jte-syntax-string, #ce9178)" },
+    { tag: [tags.operator, tags.url, tags.escape], color: "var(--jte-syntax-operator, #d4d4d4)" },
+    { tag: [tags.keyword, tags.modifier, tags.operatorKeyword, tags.controlKeyword, tags.definitionKeyword, tags.moduleKeyword], color: "var(--jte-syntax-keyword, #569cd6)" },
+    { tag: [tags.function(tags.variableName), tags.className, tags.typeName, tags.definition(tags.typeName)], color: "var(--jte-syntax-function, #decc88)" },
+    { tag: [tags.regexp, tags.variableName], color: "var(--jte-syntax-variable, #d16969)" },
+    { tag: tags.meta, color: "var(--jte-syntax-meta, #569cd6)" },
 ]);
 
 /** Combined theme + highlighting as a single extension */

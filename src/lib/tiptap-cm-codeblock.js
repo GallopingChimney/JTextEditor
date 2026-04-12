@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { EditorState, Compartment } from "@codemirror/state";
-import { EditorView, keymap, drawSelection } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { history } from "@codemirror/commands";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
@@ -29,7 +29,6 @@ class CodeBlockView {
                 extensions: [
                     jteThemeExtension,
                     history(),
-                    drawSelection(),
                     indentOnInput(),
                     bracketMatching(),
                     closeBrackets(),
