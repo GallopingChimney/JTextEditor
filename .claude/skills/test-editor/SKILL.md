@@ -23,3 +23,5 @@ Start the dev server for JTextEditor.
 - The demo uses browser-native File System Access API for open/save
 - Material Symbols font loaded via CDN in `demo/index.html`
 - Always check build first — a broken build wastes time
+- Editor engines: CodeMirror 6 (plain text mode), TipTap (rich text mode)
+- Mode toggle in TopBar switches between plain/rich per tab

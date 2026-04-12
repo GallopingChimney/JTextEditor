@@ -1,8 +1,8 @@
 <script>
     import TopBar from "./TopBar.svelte";
     import TabBar from "./TabBar.svelte";
-    import FindBar from "./FindBar.svelte";
-    import PlainTextEditor from "./PlainTextEditor.svelte";
+    import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
+    import RichTextEditor from "./RichTextEditor.svelte";
     import { detectLineEnding, splitLines } from "./lib/characters.js";
     import { languages } from "./lib/languages.js";
 
@@ -29,12 +29,9 @@
     let showLineNumbers = $state(true);
     let wordWrap = $state(false);
     let highlightLine = $state(true);
-    let showFind = $state(false);
-    let findFocusTick = $state(0);
-    let findAction = $state(null);
     let cursorLine = $state(1);
     let cursorCol = $state(1);
-    let currentMatchIdx = $state(-1);
+    let editorRef = $state();
 
     let lineEnding = $derived(
         activeTab ? detectLineEnding(activeTab.content) : "lf",
@@ -43,12 +40,15 @@
         activeTab ? splitLines(activeTab.content).length : 0,
     );
 
+    let isPlainMode = $derived(activeTab?.mode !== "rich");
+
     function makeTab(overrides = {}) {
         return {
             id: "tab-" + nextId++,
             name: "Untitled",
             content: "",
             language: "",
+            mode: "plain",
             modified: false,
             path: "",
             ...overrides,
@@ -100,19 +100,9 @@
             case "file.closeTab":
                 closeTab(activeTabId);
                 break;
-            case "edit.toggleFind":
-                showFind = !showFind;
-                if (showFind) findFocusTick++;
-                else
-                    findAction = {
-                        type: "clear",
-                        search: "",
-                        _tick: Date.now(),
-                    };
-                break;
             case "edit.find":
-                showFind = true;
-                findFocusTick++;
+            case "edit.toggleFind":
+                editorRef?.focusSearch();
                 break;
             case "view.wordWrap":
                 wordWrap = !wordWrap;
@@ -126,25 +116,12 @@
             case "view.invisibles":
                 showInvisibles = !showInvisibles;
                 break;
+            case "view.toggleMode": {
+                const tab = tabs.find((t) => t.id === activeTabId);
+                if (tab) tab.mode = tab.mode === "rich" ? "plain" : "rich";
+                break;
+            }
         }
-    }
-
-    function handleFindAction(action, data) {
-        if (action === "find.close") {
-            showFind = false;
-            findAction = { type: "clear", search: "", _tick: Date.now() };
-            return;
-        }
-        const type = action.replace("find.", "");
-        findAction = {
-            type,
-            search: data.search,
-            replace: data?.replace,
-            matchCase: data?.matchCase,
-            wholeWord: data?.wholeWord,
-            useRegex: data?.useRegex,
-            _tick: Date.now(),
-        };
     }
 
     function handleKeydown(e) {
@@ -160,14 +137,6 @@
         if (mod && e.key === "w") {
             e.preventDefault();
             closeTab(activeTabId);
-        }
-        if (mod && e.key === "f") {
-            e.preventDefault();
-            handleAction("edit.find");
-        }
-        if (mod && e.key === "h") {
-            e.preventDefault();
-            handleAction("edit.find");
         }
         if (mod && e.shiftKey && e.key === "I") {
             e.preventDefault();
@@ -211,33 +180,31 @@
             {wordWrap}
             {showInvisibles}
             {highlightLine}
-            {showFind}
+            {isPlainMode}
             onaction={handleAction}
             onback={() => onback?.()}
             onclose={() => onclose?.()}
         />
 
         <div class="jte-editor-wrap">
-            <FindBar
-                visible={showFind}
-                shouldFocus={findFocusTick}
-                content={activeTab.content}
-                {currentMatchIdx}
-                onaction={handleFindAction}
-            />
-
-            <PlainTextEditor
-                content={activeTab.content}
-                language={activeTab.language}
-                {showInvisibles}
-                {showLineNumbers}
-                {wordWrap}
-                {highlightLine}
-                {findAction}
-                onchange={handleChange}
-                oncursor={handleCursor}
-                onmatchchange={(idx) => (currentMatchIdx = idx)}
-            />
+            {#if isPlainMode}
+                <CodeMirrorEditor
+                    bind:this={editorRef}
+                    content={activeTab.content}
+                    language={activeTab.language}
+                    {showInvisibles}
+                    {showLineNumbers}
+                    {wordWrap}
+                    {highlightLine}
+                    onchange={handleChange}
+                    oncursor={handleCursor}
+                />
+            {:else}
+                <RichTextEditor
+                    content={activeTab.content}
+                    onchange={handleChange}
+                />
+            {/if}
         </div>
 
         <div class="jte-bottom">
@@ -254,21 +221,25 @@
                 />
             </div>
             <div class="jte-bottom-right">
-                <select
-                    class="jte-lang-select"
-                    value={activeTab.language}
-                    onchange={(e) => {
-                        const tab = tabs.find((t) => t.id === activeTabId);
-                        if (tab) tab.language = e.target.value;
-                    }}
-                >
-                    {#each languages as [val, label]}
-                        <option value={val}>{label}</option>
-                    {/each}
-                </select>
-                <span class="jte-status">Ln {cursorLine}, Col {cursorCol}</span>
-                <span class="jte-status">{totalLines} lines</span>
-                <span class="jte-status">{lineEnding.toUpperCase()}</span>
+                {#if isPlainMode}
+                    <select
+                        class="jte-lang-select"
+                        value={activeTab.language}
+                        onchange={(e) => {
+                            const tab = tabs.find((t) => t.id === activeTabId);
+                            if (tab) tab.language = e.target.value;
+                        }}
+                    >
+                        {#each languages as [val, label]}
+                            <option value={val}>{label}</option>
+                        {/each}
+                    </select>
+                    <span class="jte-status">Ln {cursorLine}, Col {cursorCol}</span>
+                    <span class="jte-status">{totalLines} lines</span>
+                    <span class="jte-status">{lineEnding.toUpperCase()}</span>
+                {:else}
+                    <span class="jte-status">Rich Text</span>
+                {/if}
             </div>
         </div>
     {/if}

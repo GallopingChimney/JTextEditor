@@ -6,7 +6,7 @@
     wordWrap = false,
     showInvisibles = false,
     highlightLine = true,
-    showFind = false,
+    isPlainMode = true,
     onaction,
     onback,
     onclose,
@@ -77,15 +77,21 @@
   </div>
 
   <div class="jte-top-right">
-    <button class="jte-tb" title="Undo (Ctrl+Z)" onclick={() => action('edit.undo')}>
-      <span class="material-symbols-outlined">undo</span>
-    </button>
-    <button class="jte-tb" title="Redo (Ctrl+Y)" onclick={() => action('edit.redo')}>
-      <span class="material-symbols-outlined">redo</span>
-    </button>
+    {#if isPlainMode}
+      <button class="jte-tb" title="Find & Replace (Ctrl+F)" onclick={() => action('edit.find')}>
+        <span class="material-symbols-outlined">search</span>
+      </button>
 
-    <button class="jte-tb" class:active={showFind} title="Find & Replace (Ctrl+F)" onclick={() => action('edit.toggleFind')}>
-      <span class="material-symbols-outlined">search</span>
+      <span class="jte-top-sep"></span>
+    {/if}
+
+    <button
+      class="jte-tb jte-mode-toggle"
+      class:active={!isPlainMode}
+      title={isPlainMode ? "Switch to Rich Text" : "Switch to Plain Text"}
+      onclick={() => action('view.toggleMode')}
+    >
+      <span class="material-symbols-outlined">{isPlainMode ? 'code' : 'edit_note'}</span>
     </button>
 
     <span class="jte-top-sep"></span>
@@ -101,21 +107,23 @@
             Word Wrap
             {#if wordWrap}<span class="jte-check">&#10003;</span>{/if}
           </button>
-          <button class="jte-dd-item" onclick={() => action('view.lineNumbers')}>
-            <span class="material-symbols-outlined" class:on={showLineNumbers}>format_list_numbered</span>
-            Line Numbers
-            {#if showLineNumbers}<span class="jte-check">&#10003;</span>{/if}
-          </button>
-          <button class="jte-dd-item" onclick={() => action('view.highlightLine')}>
-            <span class="material-symbols-outlined" class:on={highlightLine}>highlight</span>
-            Highlight Line
-            {#if highlightLine}<span class="jte-check">&#10003;</span>{/if}
-          </button>
-          <button class="jte-dd-item" onclick={() => action('view.invisibles')}>
-            <span class="material-symbols-outlined" class:on={showInvisibles}>space_bar</span>
-            Invisibles
-            {#if showInvisibles}<span class="jte-check">&#10003;</span>{/if}
-          </button>
+          {#if isPlainMode}
+            <button class="jte-dd-item" onclick={() => action('view.lineNumbers')}>
+              <span class="material-symbols-outlined" class:on={showLineNumbers}>format_list_numbered</span>
+              Line Numbers
+              {#if showLineNumbers}<span class="jte-check">&#10003;</span>{/if}
+            </button>
+            <button class="jte-dd-item" onclick={() => action('view.highlightLine')}>
+              <span class="material-symbols-outlined" class:on={highlightLine}>highlight</span>
+              Highlight Line
+              {#if highlightLine}<span class="jte-check">&#10003;</span>{/if}
+            </button>
+            <button class="jte-dd-item" onclick={() => action('view.invisibles')}>
+              <span class="material-symbols-outlined" class:on={showInvisibles}>space_bar</span>
+              Invisibles
+              {#if showInvisibles}<span class="jte-check">&#10003;</span>{/if}
+            </button>
+          {/if}
         </div>
       {/if}
     </div>
@@ -182,8 +190,7 @@
     color: var(--jte-fg, #d4d4d4);
   }
 
-  .jte-tb.active {
-    background: var(--jte-toolbar-active, #444);
+  .jte-mode-toggle.active {
     color: var(--jte-accent, #569cd6);
   }
 

@@ -2,7 +2,7 @@
 name: trace-feature
 description: Trace the full data flow of a JTextEditor feature — state ownership, props, callbacks, CSS, and event handlers.
 user-invocable: true
-argument-hint: [feature name, e.g. find-replace, tabs, syntax-highlighting]
+argument-hint: [feature name, e.g. find-replace, tabs, syntax-highlighting, mode-switching]
 allowed-tools: Read, Grep, Glob
 ---
 
@@ -13,14 +13,16 @@ Given a feature name, trace its complete implementation path through the codebas
 ## Process
 
 1. Identify the feature from the argument. Common features:
-   - `find-replace` — search, match highlighting, replace single/all, match options
-   - `line-highlight` — current line background + active gutter number
-   - `syntax-highlighting` — Prism overlay, language selection, token colors
-   - `tabs` — multi-tab state, tab bar, active tab switching
+   - `find-replace` — CM's native search with custom panel (cm-search-panel.js), floating top-right
+   - `syntax-highlighting` — CM Lezer parser, cm-theme.js highlight style, cm-languages.js lazy loader
+   - `tabs` — multi-tab state, tab bar, active tab switching, content sync via lastEmitted guard
    - `file-io` — open/save callbacks, modified state, breadcrumb
-   - `line-numbers` — gutter rendering, scroll sync
-   - `word-wrap` — toggle, CSS changes
-   - `keyboard-shortcuts` — all keybindings and where they're handled
+   - `line-numbers` — CM lineNumbers() extension, toggled via Compartment
+   - `word-wrap` — CM EditorView.lineWrapping, toggled via Compartment
+   - `invisibles` — cm-invisibles.js ViewPlugin, toggled via Compartment
+   - `mode-switching` — plain/rich toggle, conditional rendering in JTextEditor
+   - `keyboard-shortcuts` — shell-level (save/new/close) vs editor-level (CM/TipTap own their keys)
+   - `code-blocks` — CM6 inside TipTap via tiptap-cm-codeblock.js ProseMirror NodeView
 
 2. For the identified feature, report:
 
@@ -39,12 +41,13 @@ Given a feature name, trace its complete implementation path through the codebas
 ## Context
 
 Architecture overview:
-- `JTextEditor.svelte` — owns tab state, view toggles, find state, routes actions
-- `PlainTextEditor.svelte` — owns textarea, overlay, cursor tracking, find execution
-- `TopBar.svelte` — renders buttons, emits action strings via `onaction` callback
-- `FindBar.svelte` — owns search/replace input state, emits find actions, displays match count
+- `JTextEditor.svelte` — owns tab state, view toggles, mode switching, routes actions
+- `CodeMirrorEditor.svelte` — thin CM6 wrapper, Compartments for dynamic reconfig, exposes focusSearch/execCommand
+- `RichTextEditor.svelte` — thin TipTap wrapper, CM6-powered code blocks via tiptap-cm-codeblock.js
+- `TopBar.svelte` — renders buttons, mode toggle, emits action strings via `onaction` callback
 - `TabBar.svelte` — renders tab pills, emits select/close/new
-- Shared data in `src/lib/languages.js` and `src/lib/characters.js`
+- `cm-search-panel.js` — custom CM search panel UI (floating FindBar design)
+- Shared CM infra in `src/lib/cm-*.js`, shared language list in `src/lib/languages.js`
 
 ## Principles
 - Keep the trace factual — read the actual code, don't guess
