@@ -61,6 +61,7 @@
     "@tiptap/extension-underline": "^3.22.3",
     "@tiptap/pm": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
-    "codemirror": "^6.0.2"
+    "codemirror": "^6.0.2",
+    "vanilla-colorful": "^0.7.2"
   }
 }

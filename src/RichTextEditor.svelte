@@ -104,7 +104,7 @@
 				FontFamily,
 				FontSize,
 				Highlight.configure({
-					multicolor: false,
+					multicolor: true,
 				}),
 				Image.configure({
 					inline: false,

@@ -1,4 +1,6 @@
 <script>
+	import "vanilla-colorful/hex-color-picker.js";
+
 	let { editor, pinned = false, onpin, tick = 0 } = $props();
 
 	const fontSizes = ["8px", "10px", "12px", "14px", "18px", "24px", "48px", "96px"];
@@ -11,9 +13,25 @@
 		{ label: "Verdana", value: "Verdana, Geneva, sans-serif" },
 	];
 
+	// Swatch presets
+	const textSwatches = [
+		// Pure spectrum
+		"#ff0000", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00ff",
+		// Softer tones
+		"#e06c75", "#e5c07b", "#98c379", "#56b6c2", "#61afef", "#c678dd",
+		// Neutrals
+		"#ffffff", "#d4d4d4", "#808080", "#505050", "#282828", "#000000",
+	];
+	const highlightSwatches = [
+		// Pure spectrum
+		"#ff0000", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00ff",
+		// Softer tones
+		"#e06c75", "#e5c07b", "#98c379", "#56b6c2", "#61afef", "#c678dd",
+		// Highlighter colors
+		"#ffcc00", "#ff9632", "#ff6b6b", "#69db7c", "#74c0fc", "#e599f7",
+	];
+
 	let openPopup = $state(null);
-	let colorInput = $state();
-	let highlightInput = $state();
 	let overflowOpen = $state(false);
 	let toolbarEl = $state();
 
@@ -47,7 +65,8 @@
 			alignJustify: editor.isActive({ textAlign: 'justify' }),
 			fontSize: editor.getAttributes('textStyle')?.fontSize || '',
 			fontFamily: editor.getAttributes('textStyle')?.fontFamily || '',
-			color: editor.getAttributes('textStyle')?.color || '#d4d4d4',
+			color: editor.getAttributes('textStyle')?.color || '',
+			highlightColor: editor.getAttributes('highlight')?.color || '#ffcc00',
 			canMerge: editor.isActive('table') && editor.can().mergeCells(),
 			canSplit: editor.isActive('table') && editor.can().splitCell(),
 		};
@@ -109,20 +128,29 @@
 		closePopups();
 	}
 
-	function openColorPicker() {
-		colorInput?.click();
+	// Swatch clicks: focus editor then apply (instant, one-shot)
+	function applyColor(hex) {
+		editor?.chain().focus().setColor(hex).run();
 	}
 
-	function applyColor(e) {
-		editor?.chain().focus().setColor(e.target.value).run();
+	function applyHighlight(hex) {
+		editor?.chain().focus().toggleHighlight({ color: hex }).run();
 	}
 
-	function openHighlightPicker() {
-		highlightInput?.click();
+	// Picker drag: apply without stealing focus (continuous updates)
+	function applyColorLive(hex) {
+		editor?.chain().setColor(hex).run();
 	}
 
-	function applyHighlightColor(e) {
-		editor?.chain().focus().toggleHighlight({ color: e.target.value }).run();
+	function applyHighlightLive(hex) {
+		editor?.chain().toggleHighlight({ color: hex }).run();
+	}
+
+	// Svelte action for vanilla-colorful (can't bind hyphenated custom events via onX)
+	function pickerAction(node, callback) {
+		const handler = (e) => callback(e.detail.value);
+		node.addEventListener("color-changed", handler);
+		return { destroy() { node.removeEventListener("color-changed", handler); } };
 	}
 
 	function insertTable() {
@@ -291,31 +319,52 @@
 
 		<span class="jte-bb-sep"></span>
 
-		<!-- Text color + highlight -->
+		<!-- Text color -->
 		<div class="jte-bb-wrap">
-			<button class="jte-bb jte-bb-color-btn" title="Text Color" onclick={openColorPicker}>
-				<span class="material-symbols-outlined">format_color_text</span>
-				<span class="jte-bb-color-bar" style="background:{state.color}"></span>
+			<button class="jte-bb jte-bb-color-stack" title="Text Color" onclick={() => togglePopup("textColor")}>
+				<span class="jte-bb-color-icon">A</span>
+				<span class="jte-bb-color-bar" style="background:{state.color || 'var(--jte-fg, #d4d4d4)'}"></span>
 			</button>
-			<input
-				type="color"
-				bind:this={colorInput}
-				value={state.color}
-				oninput={applyColor}
-				class="jte-bb-color-input"
-			/>
+			{#if openPopup === "textColor"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown jte-bb-color-panel" onclick={handlePopupClick}>
+					<hex-color-picker use:pickerAction={applyColorLive} color={state.color || '#d4d4d4'}></hex-color-picker>
+					<div class="jte-bb-swatches">
+						{#each textSwatches as c}
+							<button
+								class="jte-bb-swatch"
+								style="background:{c}"
+								title={c}
+								onclick={() => applyColor(c)}
+							></button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
+
+		<!-- Highlight color -->
 		<div class="jte-bb-wrap">
-			<button class="jte-bb" class:active={state.highlight} title="Highlight" onclick={openHighlightPicker}>
-				<span class="material-symbols-outlined">format_ink_highlighter</span>
+			<button class="jte-bb jte-bb-color-stack" class:active={state.highlight} title="Highlight" onclick={() => togglePopup("highlightColor")}>
+				<span class="material-symbols-outlined jte-bb-color-icon">ink_highlighter</span>
+				<span class="jte-bb-color-bar" style="background:{state.highlightColor}"></span>
 			</button>
-			<input
-				type="color"
-				bind:this={highlightInput}
-				value="#ffcc00"
-				oninput={applyHighlightColor}
-				class="jte-bb-color-input"
-			/>
+			{#if openPopup === "highlightColor"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown jte-bb-color-panel" onclick={handlePopupClick}>
+					<hex-color-picker use:pickerAction={applyHighlightLive} color={state.highlightColor}></hex-color-picker>
+					<div class="jte-bb-swatches">
+						{#each highlightSwatches as c}
+							<button
+								class="jte-bb-swatch"
+								style="background:{c}"
+								title={c}
+								onclick={() => applyHighlight(c)}
+							></button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 
 		<span class="jte-bb-sep"></span>
@@ -576,26 +625,63 @@
 		background: rgba(224, 108, 117, 0.12);
 	}
 
-	.jte-bb-color-input {
-		position: absolute;
-		width: 0;
-		height: 0;
-		opacity: 0;
-		pointer-events: none;
+	/* Text color / highlight: icon stacked above color bar */
+	.jte-bb-color-stack {
+		flex-direction: column;
+		gap: 0;
+		padding: 3px 5px 2px;
 	}
 
-	/* Text color button with indicator bar */
-	.jte-bb-color-btn {
-		position: relative;
+	.jte-bb-color-icon {
+		font-size: 14px;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	.jte-bb-color-icon.material-symbols-outlined {
+		font-size: 14px;
+		font-weight: 400;
 	}
 
 	.jte-bb-color-bar {
-		position: absolute;
-		bottom: 2px;
-		left: 4px;
-		right: 4px;
-		height: 2px;
+		width: 14px;
+		height: 3px;
 		border-radius: 1px;
+		flex-shrink: 0;
+	}
+
+	/* Color picker popup — user-select: text overrides inherited none (auto can't) */
+	.jte-bb-color-panel {
+		padding: 8px;
+		min-width: auto;
+		user-select: text;
+	}
+
+	.jte-bb-color-panel :global(hex-color-picker) {
+		width: 180px;
+		height: 140px;
+	}
+
+	.jte-bb-swatches {
+		display: grid;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 2px;
+		margin-top: 6px;
+	}
+
+	.jte-bb-swatch {
+		width: 100%;
+		aspect-ratio: 1;
+		border: none;
+		border-radius: 2px;
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.jte-bb-swatch:hover {
+		outline: 2px solid var(--jte-fg, #d4d4d4);
+		outline-offset: -1px;
+		z-index: 1;
 	}
 
 	/* Overflow panel */
