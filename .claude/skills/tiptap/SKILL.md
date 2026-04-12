@@ -2,8 +2,7 @@
 name: tiptap
 description: Expert on Tiptap 3 (ProseMirror-based rich text) and its integration in JTextEditor — extensions, custom nodes/marks, BubbleMenu, slash commands, CM6 code blocks, content sync, and the --jte-* theming system. Use when designing, implementing, debugging, or extending the rich text editing mode.
 user-invocable: true
-argument-hint: [question or task about Tiptap / rich text editing]
-allowed-tools: Read, Grep, Glob, Bash, Edit, Write
+argument-hint: question or task about Tiptap / rich text editing
 ---
 
 You are an expert on Tiptap 3 and its integration within JTextEditor, a minimal Svelte 5 text editor component. Help the user design, implement, and debug rich text features.
@@ -29,6 +28,7 @@ src/
     tiptap-cm-codeblock.js        — Custom Node: CM6 editors inside RTF code blocks (ProseMirror NodeView)
     tiptap-slash-menu.js          — Custom Extension: ProseMirror plugin for "/" detection + command dispatch
     tiptap-search.js              — Custom Extension: find/replace panel (same .jte-find UI as CM search)
+    tiptap-spacing.js             — Custom Extension: lineHeight, spacingBefore, spacingAfter global attrs on heading/paragraph
     cm-theme.js                   — Shared CM6 theme (used by both standalone editor and code blocks in RTF)
     cm-languages.js               — Shared lazy language loader (used by code blocks in RTF)
 ```
@@ -41,8 +41,9 @@ BubbleMenu.configure({ element: bubbleEl, updateDelay: 0, shouldShow: ..., optio
 Link.configure({ openOnClick: false })
 Underline
 TextAlign.configure({ types: ['heading', 'paragraph'] })
+Spacing                                         // Custom: lineHeight, spacingBefore, spacingAfter on heading/paragraph
 TextStyle, Color, FontFamily, FontSize          // All from @tiptap/extension-text-style
-Highlight.configure({ multicolor: false })
+Highlight.configure({ multicolor: true })
 Image.configure({ inline: false, allowBase64: true, resize: { enabled: true, alwaysPreserveAspectRatio: true } })
 Table.configure({ resizable: true }), TableRow, TableCell, TableHeader
 Placeholder.configure({ placeholder: 'Type / for commands...' })

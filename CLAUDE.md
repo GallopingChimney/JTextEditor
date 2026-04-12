@@ -32,6 +32,9 @@ src/
     tiptap-cm-codeblock.js   — TipTap extension: CM6-powered code blocks in RTF mode
     tiptap-slash-menu.js     — TipTap extension: ProseMirror plugin for "/" command detection
     tiptap-search.js         — TipTap extension: find/replace with same FindBar UI as CM
+    ai-context.js            — Builds context object from editor state for AI provider
+    ai-actions.js            — Mode-aware AI action presets (code vs rich text)
+  AiPrompt.svelte            — Ctrl+K floating input for inline AI generation
 ```
 
 ## Data flow
@@ -44,6 +47,7 @@ src/
 - CM reconfiguration: Compartments for language, line numbers, word wrap, active line, invisibles
 - Settings override: `settings` prop (all fields optional) overrides internal `$state` via `$derived(settings.x ?? _x)`. Host omits a key → internal state applies. `onsettingschange` callback fires on internal toggles with effective state snapshot. Settings include: showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageCanvasColor, pageColor.
 - Dirty state: `tab.modified` set true on content change. Red `*` shown in breadcrumb (TopBar) and tab pill (TabBar). `markSaved()` resets it.
+- AI integration: `ai` prop on JTextEditor with `{ transform(ctx, instruction), generate(ctx, prompt) }` — both return `AsyncIterable<string>`. Host provides AI backend, component handles all UI. Context built by `ai-context.js` (content, selection, cursor, mode, language). Actions are mode-aware (`ai-actions.js`): code gets explain/refactor/fix, rich text gets rewrite/simplify/expand/shorten. BubbleToolbar shows sparkle button → action dropdown. Ctrl+K opens `AiPrompt` floating input for inline generation. Status indicator (sparkle icon) in bottom-right status bar pulses during generation.
 
 ## Key decisions
 

@@ -78,6 +78,82 @@ class Parser:
     }
   }
 
+  // Stream Claude API response, yielding text chunks
+  async function* streamClaude(messages) {
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+    if (!apiKey || apiKey === 'your-key-here') {
+      yield '[Set VITE_ANTHROPIC_API_KEY in demo/.env to use real AI]';
+      return;
+    }
+
+    const res = await fetch('/api/anthropic/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        stream: true,
+        messages,
+      }),
+    });
+
+    if (!res.ok) {
+      yield `[API error: ${res.status} ${res.statusText}]`;
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') return;
+        try {
+          const event = JSON.parse(data);
+          if (event.type === 'content_block_delta' && event.delta?.text) {
+            yield event.delta.text;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  // Real AI provider — calls Claude via Vite proxy
+  const ai = {
+    async *transform(ctx, instruction) {
+      const systemMsg = ctx.format === 'html'
+        ? 'You are an AI writing assistant. Return only the transformed text, no explanation. Preserve HTML formatting.'
+        : 'You are an AI coding assistant. Return only the transformed code, no explanation or markdown fences.';
+      yield* streamClaude([
+        { role: 'user', content: `${systemMsg}\n\n${instruction}:\n\n${ctx.selection}` },
+      ]);
+    },
+    async *generate(ctx, prompt) {
+      const systemMsg = ctx.format === 'html'
+        ? 'You are an AI writing assistant. Generate content directly, no explanation.'
+        : `You are an AI coding assistant. Generate ${ctx.language || 'code'} directly, no explanation or markdown fences.`;
+      const context = ctx.before ? `Context (text before cursor):\n${ctx.before.slice(-500)}\n\n` : '';
+      yield* streamClaude([
+        { role: 'user', content: `${systemMsg}\n\n${context}Instruction: ${prompt}` },
+      ]);
+    },
+  };
+
   async function handleSave(tab) {
     try {
       if ('showSaveFilePicker' in window) {
@@ -104,6 +180,7 @@ class Parser:
   <JTextEditor
     bind:this={editor}
     tabs={sampleTabs}
+    ai={ai}
     onsave={handleSave}
     onsaveAs={handleSave}
     onopen={handleOpen}

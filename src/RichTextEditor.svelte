@@ -17,10 +17,15 @@
 	import { CodeBlockCM } from "./lib/tiptap-cm-codeblock.js";
 	import { SlashMenu } from "./lib/tiptap-slash-menu.js";
 	import { TiptapSearch } from "./lib/tiptap-search.js";
+	import { Spacing } from "./lib/tiptap-spacing.js";
+	import { mdToHtml } from "./lib/markdown-html.js";
+	import { buildContext } from "./lib/ai-context.js";
+	import { getActions } from "./lib/ai-actions.js";
 	import BubbleToolbar from "./BubbleToolbar.svelte";
 	import SlashMenuPopup from "./SlashMenu.svelte";
+	import AiPrompt from "./AiPrompt.svelte";
 
-	let { content = "", onchange, pageWidth = "full", wordWrap = true } = $props();
+	let { content = "", onchange, pageWidth = "full", wordWrap = true, ai = null } = $props();
 
 	let editorEl = $state();
 	let bubbleEl = $state();
@@ -58,6 +63,128 @@
 	let slashCoords = $state(null);
 	let slashQuery = $state("");
 	let slashMenuRef = $state();
+
+	// AI state
+	let aiGenerating = $state(false);
+	let aiAbort = $state(null);
+	let aiPromptVisible = $state(false);
+	let aiPromptCoords = $state(null);
+	let aiPromptHasSelection = $state(false);
+
+	let aiActions = $derived(ai ? getActions("rich") : []);
+
+	function getEditorContext() {
+		if (!editor) return null;
+		const { from, to } = editor.state.selection;
+		const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n");
+		const selection = from !== to ? editor.state.doc.textBetween(from, to, "\n") : "";
+		return buildContext({ content: text, selection, cursorOffset: to, mode: "rich" });
+	}
+
+	async function handleAiAction(action) {
+		if (!ai?.transform || !editor) return;
+		if (action.id === "custom") {
+			showAiPrompt();
+			return;
+		}
+		const ctx = getEditorContext();
+		if (!ctx?.selection) return;
+		await runAiStream(ai.transform(ctx, action.instruction), true);
+	}
+
+	async function handleAiGenerate(prompt, opts) {
+		aiPromptVisible = false;
+		if (!ai?.generate || !editor) return;
+		const ctx = getEditorContext();
+		await runAiStream(ai.generate(ctx, prompt), opts?.replace ?? false);
+	}
+
+	/** Insert raw AI text during streaming — paragraph breaks on \n\n, no formatting. */
+	function insertAiText(text) {
+		if (!text) return;
+		if (/<(?:p|h[1-6]|div|ul|ol|li|blockquote|pre)[>\s/]/i.test(text)) {
+			editor.commands.insertContent(text);
+			return;
+		}
+		const segments = text.split(/\n{2,}/);
+		for (let i = 0; i < segments.length; i++) {
+			if (segments[i]) editor.commands.insertContent(segments[i]);
+			if (i < segments.length - 1) editor.commands.splitBlock();
+		}
+	}
+
+	async function runAiStream(iterable, replaceSelection) {
+		if (!iterable || !editor) return;
+		const abort = new AbortController();
+		aiAbort = abort;
+		aiGenerating = true;
+		let buf = "";
+		let collected = "";
+
+		try {
+			if (replaceSelection) {
+				editor.commands.deleteSelection();
+			} else if (editor.state.selection.from !== editor.state.selection.to) {
+				editor.commands.setTextSelection(editor.state.selection.to);
+				editor.commands.splitBlock();
+				editor.commands.splitBlock();
+			}
+
+			const startPos = editor.state.selection.from;
+
+			for await (const chunk of iterable) {
+				if (abort.signal.aborted) break;
+				buf += chunk;
+				collected += chunk;
+
+				const m = buf.match(/\n+$/);
+				const trailing = m ? m[0] : "";
+				const ready = buf.slice(0, buf.length - trailing.length);
+				buf = trailing;
+
+				if (ready) insertAiText(ready);
+			}
+
+			if (buf) insertAiText(buf);
+
+			// Post-process: swap raw text with markdown-converted HTML
+			// Skip if the AI already returned HTML (transforms often do)
+			if (collected && !abort.signal.aborted) {
+				const isHtml = /<(?:p|h[1-6]|div|ul|ol|li|blockquote|pre)[>\s/]/i.test(collected);
+				if (!isHtml) {
+					const endPos = editor.state.selection.to;
+					editor.chain()
+						.setTextSelection({ from: startPos, to: endPos })
+						.deleteSelection()
+						.insertContent(mdToHtml(collected))
+						.run();
+				}
+			}
+		} finally {
+			aiGenerating = false;
+			aiAbort = null;
+		}
+	}
+
+	function stopAi() {
+		aiAbort?.abort();
+	}
+
+	function showAiPrompt() {
+		if (!editor) return;
+		const { view } = editor;
+		const { from, to } = editor.state.selection;
+		const coords = view.coordsAtPos(view.state.selection.head);
+		if (coords) {
+			aiPromptCoords = { x: coords.left, y: coords.bottom + 4 };
+			aiPromptHasSelection = from !== to;
+			aiPromptVisible = true;
+		}
+	}
+
+	export function openAiPrompt() {
+		showAiPrompt();
+	}
 
 	// Mount — only depends on editorEl
 	$effect(() => {
@@ -99,6 +226,7 @@
 				TextAlign.configure({
 					types: ["heading", "paragraph"],
 				}),
+				Spacing,
 				TextStyle,
 				Color,
 				FontFamily,
@@ -187,13 +315,13 @@
 <!-- Hidden bubble menu element — Tiptap positions it via tippy -->
 <div bind:this={bubbleEl} style="visibility:hidden; position:absolute; z-index:100;">
 	{#if editor && !pinned}
-		<BubbleToolbar {editor} tick={editorTick} onpin={() => pinned = true} />
+		<BubbleToolbar {editor} tick={editorTick} onpin={() => pinned = true} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
 	{/if}
 </div>
 
 <div class="jte-rich-wrap">
 	{#if pinned && editor}
-		<BubbleToolbar {editor} tick={editorTick} pinned={true} onpin={() => pinned = false} />
+		<BubbleToolbar {editor} tick={editorTick} pinned={true} onpin={() => pinned = false} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
 	{/if}
 	<div bind:this={editorEl} class="jte-rich-container" class:jte-page-view={pageWidth !== 'full'} class:jte-no-wrap={pageWidth === 'full' && !wordWrap} data-page-width={pageWidth}></div>
 </div>
@@ -205,6 +333,15 @@
 	visible={slashVisible}
 	coords={slashCoords}
 	query={slashQuery}
+/>
+
+<!-- AI inline prompt (Ctrl+K) -->
+<AiPrompt
+	visible={aiPromptVisible}
+	coords={aiPromptCoords}
+	hasSelection={aiPromptHasSelection}
+	onsubmit={handleAiGenerate}
+	oncancel={() => { aiPromptVisible = false; }}
 />
 
 <style>
@@ -244,10 +381,9 @@
 		background: var(--jte-page-color, var(--jte-menubar-bg, #252525));
 		border: 1px solid var(--jte-border, #333);
 		border-radius: 5px;
-		overflow: hidden;
 		box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
 		min-height: 1056px;
-		flex-shrink: 0;
+		flex: none;
 	}
 
 	/* Page width variants — fixed widths so the page scrolls instead of shrinking */
@@ -261,6 +397,11 @@
 
 	.jte-rich-container :global(.tiptap > *:first-child) {
 		margin-top: 0;
+	}
+
+	/* Paragraph — reset browser default margins so spacing extension has full control */
+	.jte-rich-container :global(.tiptap p) {
+		margin: 0;
 	}
 
 	/* Placeholder */

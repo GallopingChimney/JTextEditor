@@ -1,9 +1,17 @@
 <script>
 	import "vanilla-colorful/hex-color-picker.js";
 
-	let { editor, pinned = false, onpin, tick = 0 } = $props();
+	let { editor, pinned = false, onpin, tick = 0, aiActions = [], aiGenerating = false, onaiaction, onaistop } = $props();
 
 	const fontSizes = ["8px", "10px", "12px", "14px", "18px", "24px", "48px", "96px"];
+	const lineHeights = ["1", "1.15", "1.5", "2", "3"];
+	const spacingPresets = [
+		{ label: "0", value: "0px" },
+		{ label: "4", value: "4px" },
+		{ label: "8", value: "8px" },
+		{ label: "16", value: "16px" },
+		{ label: "24", value: "24px" },
+	];
 	const fontFamilies = [
 		{ label: "Sans Serif", value: "system-ui, -apple-system, sans-serif" },
 		{ label: "Serif", value: 'Georgia, "Times New Roman", serif' },
@@ -43,6 +51,9 @@
 	let state = $derived.by(() => {
 		tick;
 		if (!editor) return {};
+		const blockAttrs = editor.isActive('heading')
+			? editor.getAttributes('heading')
+			: editor.getAttributes('paragraph');
 		return {
 			bold: editor.isActive('bold'),
 			italic: editor.isActive('italic'),
@@ -69,6 +80,9 @@
 			highlightColor: editor.getAttributes('highlight')?.color || '#ffcc00',
 			canMerge: editor.isActive('table') && editor.can().mergeCells(),
 			canSplit: editor.isActive('table') && editor.can().splitCell(),
+			lineHeight: blockAttrs?.lineHeight || null,
+			spacingBefore: blockAttrs?.spacingBefore || null,
+			spacingAfter: blockAttrs?.spacingAfter || null,
 		};
 	});
 
@@ -87,6 +101,21 @@
 
 	function setAlign(align) {
 		editor?.chain().focus().setTextAlign(align).run();
+	}
+
+	function setLH(value) {
+		if (value === null) editor?.chain().focus().unsetLineHeight().run();
+		else editor?.chain().focus().setLineHeight(value).run();
+	}
+
+	function setSB(value) {
+		if (value === null) editor?.chain().focus().unsetSpacingBefore().run();
+		else editor?.chain().focus().setSpacingBefore(value).run();
+	}
+
+	function setSA(value) {
+		if (value === null) editor?.chain().focus().unsetSpacingAfter().run();
+		else editor?.chain().focus().setSpacingAfter(value).run();
 	}
 
 	function setFontSize(size) {
@@ -162,6 +191,10 @@
 		if (url) {
 			editor?.chain().focus().setImage({ src: url }).run();
 		}
+	}
+
+	function clearFormatting() {
+		editor?.chain().focus().clearNodes().unsetAllMarks().run();
 	}
 
 	function setLink() {
@@ -316,6 +349,9 @@
 		<button class="jte-bb" class:active={state.link} title="Link" onclick={setLink}>
 			<span class="material-symbols-outlined">link</span>
 		</button>
+		<button class="jte-bb" title="Clear Formatting" onclick={clearFormatting}>
+			<span class="material-symbols-outlined">format_clear</span>
+		</button>
 
 		<span class="jte-bb-sep"></span>
 
@@ -382,6 +418,42 @@
 		<button class="jte-bb" class:active={state.alignJustify} title="Justify" onclick={() => setAlign("justify")}>
 			<span class="material-symbols-outlined">format_align_justify</span>
 		</button>
+
+		<!-- Spacing dropdown -->
+		<div class="jte-bb-wrap">
+			<button class="jte-bb" title="Line & paragraph spacing" onclick={() => togglePopup("spacing")}>
+				<span class="material-symbols-outlined">format_line_spacing</span>
+				<span class="material-symbols-outlined" style="font-size:12px">expand_more</span>
+			</button>
+			{#if openPopup === "spacing"}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="jte-bb-dropdown jte-bb-spacing-panel" onclick={handlePopupClick}>
+					<div class="jte-bb-dd-label">Line spacing</div>
+					<div class="jte-bb-spacing-row">
+						<button class="jte-bb-chip" class:active={!state.lineHeight} onclick={() => setLH(null)}>—</button>
+						{#each lineHeights as lh}
+							<button class="jte-bb-chip" class:active={state.lineHeight === lh} onclick={() => setLH(lh)}>{lh}</button>
+						{/each}
+					</div>
+					<div class="jte-bb-dd-sep"></div>
+					<div class="jte-bb-dd-label">Before paragraph</div>
+					<div class="jte-bb-spacing-row">
+						<button class="jte-bb-chip" class:active={!state.spacingBefore} onclick={() => setSB(null)}>—</button>
+						{#each spacingPresets as sp}
+							<button class="jte-bb-chip" class:active={state.spacingBefore === sp.value} onclick={() => setSB(sp.value)}>{sp.label}</button>
+						{/each}
+					</div>
+					<div class="jte-bb-dd-sep"></div>
+					<div class="jte-bb-dd-label">After paragraph</div>
+					<div class="jte-bb-spacing-row">
+						<button class="jte-bb-chip" class:active={!state.spacingAfter} onclick={() => setSA(null)}>—</button>
+						{#each spacingPresets as sp}
+							<button class="jte-bb-chip" class:active={state.spacingAfter === sp.value} onclick={() => setSA(sp.value)}>{sp.label}</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
 
 		<span class="jte-bb-sep"></span>
 
@@ -483,6 +555,32 @@
 					</div>
 				{/if}
 			</div>
+		{/if}
+
+		<!-- AI actions -->
+		{#if aiActions.length > 0}
+			<span class="jte-bb-sep"></span>
+			{#if aiGenerating}
+				<button class="jte-bb jte-bb-ai-stop" title="Stop generating" onclick={() => onaistop?.()}>
+					<span class="material-symbols-outlined">stop_circle</span>
+				</button>
+			{:else}
+				<div class="jte-bb-wrap">
+					<button class="jte-bb jte-bb-ai" title="AI actions" onclick={() => togglePopup("ai")}>
+						<span class="material-symbols-outlined">auto_awesome</span>
+					</button>
+					{#if openPopup === "ai"}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="jte-bb-dropdown jte-bb-dropdown-right" onclick={handlePopupClick}>
+							{#each aiActions as action}
+								<button class="jte-bb-dd-item jte-bb-dd-ai" onclick={() => { onaiaction?.(action); closePopups(); }}>
+									<span class="material-symbols-outlined" style="font-size:16px">{action.icon}</span> {action.label}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 
 		<!-- Pin toggle -->
@@ -729,5 +827,70 @@
 	.jte-bb-split-arrow {
 		padding: 4px 2px;
 		border-radius: 0 4px 4px 0;
+	}
+
+	/* AI button */
+	.jte-bb-ai .material-symbols-outlined {
+		color: var(--jte-accent, #569cd6);
+	}
+
+	.jte-bb-dd-ai .material-symbols-outlined {
+		color: var(--jte-accent, #569cd6);
+	}
+
+	.jte-bb-ai-stop .material-symbols-outlined {
+		color: #e06c75;
+	}
+
+	@keyframes jte-ai-pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.5; }
+	}
+
+	.jte-bb-ai-stop {
+		animation: jte-ai-pulse 1.2s ease-in-out infinite;
+	}
+
+	/* Spacing panel */
+	.jte-bb-spacing-panel {
+		padding: 6px;
+		min-width: auto;
+	}
+
+	.jte-bb-dd-label {
+		font-size: 10px;
+		color: var(--jte-status-fg, #888);
+		padding: 2px 6px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.jte-bb-spacing-row {
+		display: flex;
+		gap: 2px;
+		padding: 2px 4px;
+	}
+
+	.jte-bb-chip {
+		padding: 3px 7px;
+		background: transparent;
+		border: 1px solid var(--jte-border, #444);
+		border-radius: 3px;
+		color: var(--jte-toolbar-fg, #aaa);
+		font-size: 11px;
+		cursor: pointer;
+		font-family: var(--jte-ui-font, system-ui, sans-serif);
+		line-height: 1;
+	}
+
+	.jte-bb-chip:hover {
+		background: var(--jte-toolbar-hover, #3a3a3a);
+		color: var(--jte-fg, #d4d4d4);
+	}
+
+	.jte-bb-chip.active {
+		color: var(--jte-accent, #569cd6);
+		border-color: var(--jte-accent, #569cd6);
+		background: rgba(86, 156, 214, 0.12);
 	}
 </style>

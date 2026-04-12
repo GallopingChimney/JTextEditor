@@ -2,8 +2,7 @@
 name: trace-feature
 description: Trace the full data flow of a JTextEditor feature — state ownership, props, callbacks, CSS, and event handlers.
 user-invocable: true
-argument-hint: [feature name, e.g. find-replace, tabs, syntax-highlighting, mode-switching]
-allowed-tools: Read, Grep, Glob
+argument-hint: feature name, e.g. find-replace, tabs, syntax-highlighting, mode-switching
 ---
 
 # Trace Feature
@@ -28,6 +27,7 @@ Given a feature name, trace its complete implementation path through the codebas
    - `format-toolbar` — BubbleToolbar.svelte: unified bubble/pinned bar (default pinned). Responsive overflow at <620px. Heading, font, marks, link, color, highlight, alignment (incl. justify), lists, block tools, table/image insert. Table editing conditional on cursor in table.
    - `keyboard-shortcuts` — shell-level (save/new/close) vs editor-level (CM/TipTap own their keys)
    - `code-blocks` — CM6 inside TipTap via tiptap-cm-codeblock.js ProseMirror NodeView
+   - `ai` — ai prop (transform/generate async iterables) → JTextEditor passes to children → editors build context (ai-context.js), stream chunks into document. TipTap streaming is paragraph-aware: chunks are buffered to detect \n\n across chunk boundaries, then split into proper `<p>` nodes via `splitBlock()` (not `<br>` in one paragraph). HTML content passes through to TipTap natively. BubbleToolbar sparkle → action dropdown (ai-actions.js, mode-aware). Ctrl+K → AiPrompt floating input → generate. Status indicator in bottom-right pulses during generation. Stop via AbortController.
 
 2. For the identified feature, report:
 

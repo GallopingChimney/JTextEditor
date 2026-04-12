@@ -9,13 +9,18 @@
     let {
         tabs: initialTabs = [],
         settings = {},
-        onopen,
-        onsave,
-        onsaveAs,
-        ontabchange,
-        onsettingschange,
-        onback,
-        onclose,
+        ai = null,
+        mode = 'sidecar',
+        onopen = undefined,
+        onsave = undefined,
+        onsaveAs = undefined,
+        ontabchange = undefined,
+        onsettingschange = undefined,
+        onback = undefined,
+        onclose = undefined,
+        onminimize = undefined,
+        onmaximize = undefined,
+        onrename = undefined,
     } = $props();
 
     let nextId = $state(1);
@@ -103,6 +108,16 @@
 
     function notifySettings() {
         onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageCanvasColor, pageColor });
+    }
+
+    function handleRename(newName) {
+        const tab = tabs.find((t) => t.id === activeTabId);
+        if (tab) {
+            tab.name = newName;
+            const ext = newName.includes('.') ? newName.split('.').pop() : '';
+            if (ext) tab.language = ext;
+            onrename?.(tab, newName);
+        }
     }
 
     function handleAction(action) {
@@ -201,6 +216,10 @@
             e.preventDefault();
             onopen?.();
         }
+        if (mod && e.key === "k" && ai) {
+            e.preventDefault();
+            editorRef?.openAiPrompt?.();
+        }
     }
 
     export function openFile({ name, content, language = "", path = "" }) {
@@ -241,9 +260,13 @@
             {bgColor}
             {pageCanvasColor}
             {pageColor}
+            {mode}
             onaction={handleAction}
+            onrename={handleRename}
             onback={() => onback?.()}
             onclose={() => onclose?.()}
+            onminimize={() => onminimize?.()}
+            onmaximize={() => onmaximize?.()}
         />
 
         <div class="jte-editor-wrap">
@@ -258,6 +281,7 @@
                     {highlightLine}
                     onchange={handleChange}
                     oncursor={handleCursor}
+                    {ai}
                 />
             {:else}
                 <RichTextEditor
@@ -266,6 +290,7 @@
                     onchange={handleChange}
                     {pageWidth}
                     {wordWrap}
+                    {ai}
                 />
             {/if}
         </div>
@@ -302,6 +327,11 @@
                     <span class="jte-status">{lineEnding.toUpperCase()}</span>
                 {:else}
                     <span class="jte-status">Rich Text</span>
+                {/if}
+                {#if ai}
+                    <span class="jte-ai-status" class:jte-ai-active={editorRef?.aiGenerating} title="AI {editorRef?.aiGenerating ? 'generating...' : 'ready'}">
+                        <span class="material-symbols-outlined">auto_awesome</span>
+                    </span>
                 {/if}
                 <button
                     class="jte-theme-btn"
@@ -446,5 +476,26 @@
 
     .jte-theme-btn .material-symbols-outlined {
         font-size: 14px;
+    }
+
+    .jte-ai-status {
+        display: flex;
+        align-items: center;
+        color: var(--jte-status-fg, #555);
+        line-height: 1;
+    }
+
+    .jte-ai-status .material-symbols-outlined {
+        font-size: 14px;
+    }
+
+    .jte-ai-active {
+        color: var(--jte-accent, #569cd6);
+        animation: jte-ai-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes jte-ai-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
 </style>

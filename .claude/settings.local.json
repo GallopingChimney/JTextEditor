@@ -16,6 +16,8 @@
       "WebFetch(domain:prosemirror.net)",
       "Skill(tiptap)",
       "Skill(tiptap:*)",
+      "Skill(producer)",
+      "Skill(producer:*)",
       "Bash(ls -la assets/*.js)"
     ]
   }

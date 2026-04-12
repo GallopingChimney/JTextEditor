@@ -2,7 +2,6 @@
 name: audit-components
 description: Audit JTextEditor for dead code, duplication, Svelte 4 patterns, and architectural issues.
 user-invocable: true
-allowed-tools: Read, Grep, Glob, Bash
 ---
 
 # Audit Components

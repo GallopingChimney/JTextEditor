@@ -13,13 +13,19 @@
     bgColor = '',
     pageCanvasColor = '',
     pageColor = '',
+    mode = 'sidecar',
     onaction,
     onback,
     onclose,
+    onminimize,
+    onmaximize,
+    onrename,
   } = $props();
 
   let openDropdown = $state(null);
   let barEl = $state();
+  let editing = $state(false);
+  let editEl = $state();
 
   let breadcrumbDir = $derived.by(() => {
     if (!path) return '';
@@ -46,6 +52,40 @@
     onaction?.(a);
   }
 
+  function startEditing() {
+    editing = true;
+    // tick: wait for contenteditable to mount, then populate and select
+    requestAnimationFrame(() => {
+      if (!editEl) return;
+      editEl.textContent = breadcrumbFile;
+      const range = document.createRange();
+      const dot = breadcrumbFile.lastIndexOf('.');
+      range.setStart(editEl.firstChild, 0);
+      range.setEnd(editEl.firstChild, dot > 0 ? dot : breadcrumbFile.length);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+  }
+
+  function commitRename() {
+    if (!editing) return;
+    const raw = (editEl?.textContent || '').trim();
+    editing = false;
+    if (raw && raw !== breadcrumbFile) {
+      onrename?.(raw);
+    }
+  }
+
+  function onEditKey(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      editEl?.blur();
+    } else if (e.key === 'Escape') {
+      editing = false;
+    }
+  }
+
   $effect(() => {
     if (!openDropdown) return;
     function onClick(e) {
@@ -56,11 +96,13 @@
   });
 </script>
 
-<div class="jte-topbar" bind:this={barEl}>
+<div class="jte-topbar" class:jte-topbar-app={mode === 'app'} bind:this={barEl}>
   <div class="jte-top-left">
-    <button class="jte-tb" title="Back" onclick={() => onback?.()}>
-      <span class="material-symbols-outlined">chevron_left</span>
-    </button>
+    {#if mode === 'sidecar'}
+      <button class="jte-tb" title="Back" onclick={() => onback?.()}>
+        <span class="material-symbols-outlined">chevron_left</span>
+      </button>
+    {/if}
 
     <div class="jte-dd-wrap">
       <button class="jte-tb" title="Menu" onclick={() => toggle('menu')}>
@@ -88,31 +130,45 @@
       {/if}
     </div>
 
-    <span class="jte-breadcrumb">{breadcrumbDir}<span class="jte-breadcrumb-file">{breadcrumbFile}</span>{#if modified}<span class="jte-dirty">*</span>{/if}</span>
+    <span class="jte-breadcrumb">
+      {breadcrumbDir}{#if editing}<span
+        class="jte-breadcrumb-file jte-breadcrumb-edit"
+        contenteditable="true"
+        role="textbox"
+        tabindex="-1"
+        bind:this={editEl}
+        onkeydown={onEditKey}
+        onblur={commitRename}
+      ></span>{:else}<span
+        class="jte-breadcrumb-file"
+        role="button"
+        tabindex="-1"
+        ondblclick={startEditing}
+      >{breadcrumbFile}</span>{/if}{#if modified}<span class="jte-dirty">*</span>{/if}
+    </span>
   </div>
 
   <div class="jte-top-right">
-    <button class="jte-tb" title="Find & Replace (Ctrl+F)" onclick={() => action('edit.find')}>
-      <span class="material-symbols-outlined">search</span>
-    </button>
-
-    <span class="jte-top-sep"></span>
-
-    <button
-      class="jte-tb jte-mode-toggle"
-      class:active={!isPlainMode}
-      title={isPlainMode ? "Switch to Rich Text" : "Switch to Plain Text"}
-      onclick={() => action('view.toggleMode')}
-    >
-      <span class="material-symbols-outlined">{isPlainMode ? 'code' : 'edit_note'}</span>
-    </button>
-
-    <span class="jte-top-sep"></span>
-
-    <div class="jte-dd-wrap">
-      <button class="jte-tb" title="View options" onclick={() => toggle('view')}>
-        <span class="material-symbols-outlined">tune</span>
+    <div class="jte-top-actions">
+      <button
+        class="jte-tb jte-mode-toggle"
+        class:active={!isPlainMode}
+        class:code={isPlainMode}
+        title={isPlainMode ? "Switch to Rich Text" : "Switch to Plain Text"}
+        onclick={() => action('view.toggleMode')}
+      >
+        <span class="material-symbols-outlined">{isPlainMode ? 'code' : 'edit_note'}</span>
+        <span class="jte-mode-label">{isPlainMode ? 'Code' : 'Rich Text'}</span>
       </button>
+
+      <button class="jte-tb" title="Find & Replace (Ctrl+F)" onclick={() => action('edit.find')}>
+        <span class="material-symbols-outlined">search</span>
+      </button>
+
+      <div class="jte-dd-wrap">
+        <button class="jte-tb" title="View options" onclick={() => toggle('view')}>
+          <span class="material-symbols-outlined">tune</span>
+        </button>
       {#if openDropdown === 'view'}
         <div class="jte-dropdown">
           {#if !isPlainMode}
@@ -180,12 +236,25 @@
         </div>
       {/if}
     </div>
+    </div>
 
     <span class="jte-top-sep"></span>
 
-    <button class="jte-tb" title="Close" onclick={() => onclose?.()}>
-      <span class="material-symbols-outlined">close</span>
-    </button>
+    {#if mode === 'app'}
+      <button class="jte-tb jte-window-btn" title="Minimize" onclick={() => onminimize?.()}>
+        <span class="material-symbols-outlined">minimize</span>
+      </button>
+      <button class="jte-tb jte-window-btn" title="Maximize" onclick={() => onmaximize?.()}>
+        <span class="material-symbols-outlined">crop_square</span>
+      </button>
+      <button class="jte-tb jte-window-btn jte-window-close" title="Close" onclick={() => onclose?.()}>
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    {:else}
+      <button class="jte-tb" title="Close" onclick={() => onclose?.()}>
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    {/if}
   </div>
 </div>
 
@@ -227,6 +296,22 @@
 
   .jte-breadcrumb-file {
     color: var(--jte-fg, #d4d4d4);
+    cursor: default;
+  }
+
+  .jte-breadcrumb-file[role="button"]:hover {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+  }
+
+  .jte-breadcrumb-edit {
+    outline: none;
+    background: var(--jte-input-focus-bg, #2a2a2a);
+    border-radius: 3px;
+    padding: 0 4px;
+    min-width: 40px;
+    display: inline-block;
   }
 
   .jte-dirty {
@@ -255,6 +340,21 @@
 
   .jte-mode-toggle.active {
     color: var(--jte-accent, #569cd6);
+  }
+
+  .jte-mode-toggle.code {
+    color: #e5a045;
+  }
+
+  .jte-mode-label {
+    font-family: var(--jte-ui-font, system-ui, sans-serif);
+    font-size: 11px;
+  }
+
+  .jte-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 1px;
   }
 
   .jte-tb .material-symbols-outlined { font-size: 16px; }
@@ -379,4 +479,30 @@
   .jte-pw-btn:hover { background: var(--jte-toolbar-hover, #333); }
   .jte-pw-btn.active { color: var(--jte-accent, #569cd6); background: rgba(86, 156, 214, 0.1); }
   .jte-pw-btn .material-symbols-outlined { font-size: 16px; }
+
+  /* App mode — draggable title bar */
+  .jte-topbar-app {
+    -webkit-app-region: drag;
+  }
+
+  .jte-topbar-app :global(button),
+  .jte-topbar-app :global(select),
+  .jte-topbar-app :global(input),
+  .jte-topbar-app :global([contenteditable]) {
+    -webkit-app-region: no-drag;
+  }
+
+  /* Window control buttons */
+  .jte-window-btn {
+    padding: 4px 8px;
+  }
+
+  .jte-window-btn .material-symbols-outlined {
+    font-size: 16px;
+  }
+
+  .jte-window-close:hover {
+    background: #e81123;
+    color: #fff;
+  }
 </style>

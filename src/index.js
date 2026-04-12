@@ -6,3 +6,5 @@ export { default as TabBar } from './TabBar.svelte';
 export { default as BubbleToolbar } from './BubbleToolbar.svelte';
 export { default as SlashMenu } from './SlashMenu.svelte';
 export { languages } from './lib/languages.js';
+export { buildContext } from './lib/ai-context.js';
+export { getActions, codeActions, richActions } from './lib/ai-actions.js';
