@@ -30,7 +30,7 @@ Run a health check on the JTextEditor codebase.
 
 ### 4. Architecture
 - Verify data flows one direction: props down, callbacks up
-- Check no component imports from Tauri or other host-specific APIs
+- Check no `src/` component imports from Tauri or other host-specific APIs (Tauri imports are only allowed in `app/`)
 - Verify CSS uses `--jte-*` custom properties, not hardcoded colors that should be themeable
 - Verify mount `$effect` blocks use `untrack()` to avoid recreation loops
 - Check that CM Compartments are used for dynamic reconfiguration (not editor recreation)

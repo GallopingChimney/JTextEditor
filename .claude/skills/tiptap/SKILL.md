@@ -16,7 +16,7 @@ $ARGUMENTS
 ## JTextEditor Architecture Context
 
 ### What JTextEditor Is
-A minimal, standalone Svelte 5 text editor component library (no Tauri dependency). Dual mode: **plain text** (CodeMirror 6) and **rich text** (Tiptap 3). Designed for embedding in Tauri desktop apps. Will eventually sidecar into JExplore.
+A minimal, standalone Svelte 5 text editor component library (no Tauri dependency in `src/`). Dual editor mode: **plain text** (CodeMirror 6) and **rich text** (Tiptap 3). Dual output: npm component library (sidecar in JExplore) or standalone Tauri desktop app (`app/` + `src-tauri/`). The `mode` prop (`'sidecar'` | `'app'`) controls TopBar chrome (back button vs window controls).
 
 ### Rich Text File Map
 ```

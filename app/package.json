@@ -1,0 +1,22 @@
+{
+  "name": "jtexteditor-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "svelte": "^5.55.1",
+    "vite": "^8.0.4"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-cli": "^2.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0"
+  }
+}

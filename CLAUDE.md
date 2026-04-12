@@ -1,25 +1,25 @@
 # JTextEditor
 
-A minimal, modular text editor component built with Svelte 5 for embedding in Tauri web apps. Powered by CodeMirror 6 (plain text) and TipTap (rich text).
+A minimal, modular text editor component built with Svelte 5 for embedding in Tauri web apps. Powered by CodeMirror 6 (plain text) and TipTap (rich text). Dual-output: usable as an **npm component library** (sidecar mode in host apps like JExplore) or as a **standalone Tauri desktop app** (app mode).
 
 ## Principles
 
 - **Minimalism is law.** No abstraction without justification. No wrapper without purpose. Fewer files, fewer lines, fewer concepts.
 - **Svelte 5 only.** Use `$state`, `$derived`, `$effect`, `$props`. Props down, callbacks up. Use `untrack()` in mount effects to prevent recreation loops.
 - **Performance by default.** CodeMirror 6 for virtualized editing (million-line capable). Lezer for incremental syntax highlighting. Languages lazy-loaded via dynamic `import()`.
-- **Standalone component.** No Tauri imports inside the component. File I/O through callback props. The component doesn't know or care what hosts it.
+- **Standalone component.** No Tauri imports inside `src/` (the component library). Tauri APIs only in `app/` (the standalone app shell). File I/O through callback props. The component doesn't know or care what hosts it.
 - **Modularity.** Each component does one thing. Shared infrastructure lives in `src/lib/`. No duplication — if it exists in two places, extract it.
 
 ## Architecture
 
 ```
-src/
-  JTextEditor.svelte        — Shell: tabs, keyboard shortcuts, layout, mode switching, theme
+src/                                         ← Component library (npm package, no Tauri imports)
+  JTextEditor.svelte        — Shell: tabs, keyboard shortcuts, layout, mode switching, theme. `mode` prop: 'sidecar' (default) or 'app'.
   CodeMirrorEditor.svelte    — Thin Svelte 5 wrapper around CodeMirror 6
   RichTextEditor.svelte      — Thin Svelte 5 wrapper around TipTap + all RTF extensions
   BubbleToolbar.svelte       — Unified format toolbar (bubble on selection, pinned bar centered by default). Reactive state via `$derived` + `tick` prop from `onTransaction`. Heading icon (format_paragraph/format_h1-3), font icon (font_download), font size input, B/I/U/S/link, color (with indicator bar), highlight, alignment, lists, code, quote, code block, divider, table/image insert. Table editing tools when cursor in table. Responsive overflow at <620px.
   SlashMenu.svelte           — Block-type picker popup triggered by "/" key. Auto-scrolls to selected item on arrow key nav.
-  TopBar.svelte              — Top bar: hamburger menu, breadcrumb (dir dimmed, filename bright, red * when dirty), mode toggle, view dropdown (page width button group, word wrap, color pickers)
+  TopBar.svelte              — Top bar: mode-aware chrome. Sidecar: back button + close. App: draggable titlebar + minimize/maximize/close window controls. Shared: hamburger menu, breadcrumb, mode toggle, view dropdown.
   TabBar.svelte              — Bottom tab pills (transparent bg, active = 2px blue bottom border + background, red * dirty indicator). Theme toggle button in bottom-right status bar.
   lib/
     languages.js             — Single source of truth for language list
@@ -35,6 +35,17 @@ src/
     ai-context.js            — Builds context object from editor state for AI provider
     ai-actions.js            — Mode-aware AI action presets (code vs rich text)
   AiPrompt.svelte            — Ctrl+K floating input for inline AI generation
+
+app/                                         ← Standalone Tauri app frontend
+  src/App.svelte             — Reads --file CLI arg, renders <JTextEditor mode="app"> with Tauri window controls
+  src/main.js                — Svelte mount
+  vite.config.js             — Vite config (port 1420, Tauri HMR)
+
+src-tauri/                                   ← Tauri v2 backend (Rust)
+  src/main.rs                — Entry point (windows_subsystem = "windows")
+  src/lib.rs                 — Tauri builder with cli + fs plugins
+  tauri.conf.json            — Window config (decorations: false), CLI args (--file), fs permissions
+  capabilities/default.json  — Tauri v2 security capabilities
 ```
 
 ## Data flow
@@ -68,10 +79,20 @@ src/
 - Pin toggle: `pinned` state in RichTextEditor (default: true = bar mode). When pinned, BubbleToolbar renders as fixed bar above editor content. When unpinned, reverts to tippy-positioned bubble on selection.
 - Default mode: rich text, normal page width, pinned toolbar.
 
+## Dual mode: sidecar vs app
+
+JTextEditor's `mode` prop controls UI chrome:
+- **`'sidecar'`** (default) — embedded in a host app (JExplore). TopBar shows back button + single close. Host manages windows, routing, keyboard.
+- **`'app'`** — standalone Tauri window. TopBar is a draggable titlebar (`-webkit-app-region: drag`) with minimize/maximize/close window controls. No back button. Window control callbacks (`onminimize`, `onmaximize`, `onclose`) wired to Tauri window API by `app/src/App.svelte`.
+
+The component library (`src/`) never imports Tauri. Only `app/` uses `@tauri-apps/api`. JExplore can launch the standalone exe with `--file <path>` for a fully independent editor window, or embed `<JTextEditor>` directly as a component.
+
 ## Dev server
 
 ```bash
-cd demo && npx vite
+npm run dev          # Browser demo (demo/src/App.svelte, port 5173)
+npm run dev:app      # Standalone Tauri app with HMR (port 1420)
+npm run build:app    # Production build (generates exe)
 ```
 
 Demo app at `demo/src/App.svelte` with browser-native file open/save.

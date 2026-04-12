@@ -13,7 +13,7 @@ $ARGUMENTS
 
 ## Architecture Overview
 
-JTextEditor is a standalone Svelte 5 editor component. It does NOT call AI APIs directly. The host app provides an `ai` prop with async generator functions. JTextEditor handles all UI — the host just provides the brain.
+JTextEditor is a standalone Svelte 5 editor component (dual-output: npm component library for sidecar embedding, or standalone Tauri app). It does NOT call AI APIs directly. The host app provides an `ai` prop with async generator functions. JTextEditor handles all UI — the host just provides the brain.
 
 ### The ai Prop Contract
 

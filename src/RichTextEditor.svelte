@@ -198,6 +198,13 @@
 				StarterKit.configure({
 					codeBlock: false,
 				}),
+				// Mod-Shift-s conflicts with Save As — unbind strike shortcut
+				Extension.create({
+					name: "strikeShortcutOverride",
+					addKeyboardShortcuts() {
+						return { "Mod-Shift-s": () => false };
+					},
+				}),
 				CodeBlockCM,
 				BubbleMenu.configure({
 					element: bubbleEl,

@@ -131,13 +131,13 @@ $ARGUMENTS
 ## Architecture Context (for no-skill requests)
 
 ```
-src/
-  JTextEditor.svelte        — Shell: tabs, keyboard shortcuts, layout, mode switching, theme, CSS var injection
+src/                                         ← Component library (npm package, no Tauri imports)
+  JTextEditor.svelte        — Shell: tabs, keyboard shortcuts, layout, mode switching, theme, CSS var injection. `mode` prop: 'sidecar' (default) | 'app'.
   CodeMirrorEditor.svelte    — CM6 wrapper: Compartments, extensions, cursor callbacks
   RichTextEditor.svelte      — TipTap wrapper: extensions, content sync, page view
   BubbleToolbar.svelte       — Format toolbar (bubble/pinned), responsive overflow
   SlashMenu.svelte           — "/" block-type picker
-  TopBar.svelte              — Hamburger menu, breadcrumb, mode toggle, view dropdown
+  TopBar.svelte              — Mode-aware chrome. Sidecar: back button + close. App: draggable titlebar + minimize/maximize/close. Shared: hamburger menu, breadcrumb, mode toggle, view dropdown.
   TabBar.svelte              — Tab pills, theme toggle button
   AiPrompt.svelte            — Ctrl+K floating input
   index.js                   — Public exports
@@ -155,6 +155,16 @@ src/
     tiptap-spacing.js        — Line height + paragraph spacing
     ai-context.js            — Editor context for AI
     ai-actions.js            — Mode-aware AI action presets
+
+app/                                         ← Standalone Tauri app frontend
+  src/App.svelte             — Reads --file CLI arg, renders <JTextEditor mode="app">
+  src/main.js                — Svelte mount
+
+src-tauri/                                   ← Tauri v2 backend (Rust)
+  src/lib.rs                 — Tauri builder with cli + fs plugins
+  tauri.conf.json            — Window config (decorations: false), CLI args
 ```
 
-Key principles: Svelte 5 only ($state/$derived/$effect/$props), minimalism, no Tauri imports, CSS vars for theming, untrack() in mount effects, props down / callbacks up.
+Key principles: Svelte 5 only ($state/$derived/$effect/$props), minimalism, no Tauri imports in `src/` (only in `app/`), CSS vars for theming, untrack() in mount effects, props down / callbacks up.
+
+Dual output: npm component library (sidecar in JExplore) + standalone Tauri exe (launched with `--file <path>`). The `mode` prop controls TopBar chrome — component doesn't know what hosts it.

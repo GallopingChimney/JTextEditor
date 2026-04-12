@@ -28,6 +28,7 @@ Given a feature name, trace its complete implementation path through the codebas
    - `keyboard-shortcuts` — shell-level (save/new/close) vs editor-level (CM/TipTap own their keys)
    - `code-blocks` — CM6 inside TipTap via tiptap-cm-codeblock.js ProseMirror NodeView
    - `ai` — ai prop (transform/generate async iterables) → JTextEditor passes to children → editors build context (ai-context.js), stream chunks into document. TipTap streaming is paragraph-aware: chunks are buffered to detect \n\n across chunk boundaries, then split into proper `<p>` nodes via `splitBlock()` (not `<br>` in one paragraph). HTML content passes through to TipTap natively. BubbleToolbar sparkle → action dropdown (ai-actions.js, mode-aware). Ctrl+K → AiPrompt floating input → generate. Status indicator in bottom-right pulses during generation. Stop via AbortController.
+   - `app-mode` — `mode` prop on JTextEditor ('sidecar' | 'app'). Sidecar (default): back button, single close. App: no back button, minimize/maximize/close window controls, draggable titlebar via `-webkit-app-region: drag`. TopBar conditionals on `mode`. Window control callbacks (`onminimize`, `onmaximize`, `onclose`) passed through from JTextEditor to TopBar. `app/src/App.svelte` wires these to Tauri's `getCurrentWindow()` API.
 
 2. For the identified feature, report:
 

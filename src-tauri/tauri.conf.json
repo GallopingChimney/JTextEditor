@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/v2/crates/tauri-cli/schema.json",
+  "productName": "JTextEditor",
+  "version": "0.1.0",
+  "identifier": "com.jtexteditor.app",
+  "build": {
+    "frontendDist": "../app/dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "cd app && npm run dev",
+    "beforeBuildCommand": "cd app && npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "JTextEditor",
+        "width": 960,
+        "height": 680,
+        "minWidth": 480,
+        "minHeight": 360,
+        "decorations": false
+      }
+    ]
+  },
+  "plugins": {
+    "cli": {
+      "args": [
+        {
+          "name": "file",
+          "short": "f",
+          "takesValue": true,
+          "description": "File to open"
+        }
+      ]
+    },
+    "fs": {}
+  }
+}

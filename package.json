@@ -15,6 +15,9 @@
   },
   "description": "",
   "scripts": {
+    "dev": "cd demo && npx vite",
+    "dev:app": "npx tauri dev",
+    "build:app": "npx tauri build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -63,5 +66,8 @@
     "@tiptap/starter-kit": "^3.22.3",
     "codemirror": "^6.0.2",
     "vanilla-colorful": "^0.7.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1"
   }
 }
