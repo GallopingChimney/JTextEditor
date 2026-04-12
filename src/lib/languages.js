@@ -9,7 +9,3 @@ export const languages = [
   ['sql', 'SQL'], ['swift', 'Swift'], ['toml', 'TOML'], ['ts', 'TypeScript'],
   ['xml', 'XML'], ['yaml', 'YAML'],
 ];
-
-export function getLangLabel(lang) {
-  return languages.find(([v]) => v === lang)?.[1] || 'Plain Text';
-}

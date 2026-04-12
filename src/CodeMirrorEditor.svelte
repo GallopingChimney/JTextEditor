@@ -92,10 +92,8 @@
         };
     });
 
-    // Sync content from parent (tab switch, external load)
     $effect(() => {
         if (!view) return;
-        // Access content to create dependency
         const c = content;
         if (c !== lastEmitted && c !== view.state.doc.toString()) {
             view.dispatch({
@@ -105,7 +103,6 @@
         }
     });
 
-    // Reconfigure language
     $effect(() => {
         if (!view) return;
         const lang = language;
@@ -116,7 +113,6 @@
         });
     });
 
-    // Reconfigure line numbers
     $effect(() => {
         if (!view) return;
         view.dispatch({
@@ -124,7 +120,6 @@
         });
     });
 
-    // Reconfigure word wrap
     $effect(() => {
         if (!view) return;
         view.dispatch({
@@ -132,7 +127,6 @@
         });
     });
 
-    // Reconfigure active line highlight
     $effect(() => {
         if (!view) return;
         view.dispatch({
@@ -142,7 +136,6 @@
         });
     });
 
-    // Reconfigure invisibles
     $effect(() => {
         if (!view) return;
         view.dispatch({
@@ -150,7 +143,6 @@
         });
     });
 
-    // Exposed methods for parent
     export function focusSearch() {
         if (view) openSearchPanel(view);
     }

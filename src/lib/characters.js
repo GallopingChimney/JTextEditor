@@ -23,13 +23,3 @@ export function detectLineEnding(text) {
 export function splitLines(text) {
   return text.split(/\r\n|\r|\n/);
 }
-
-/**
- * Line ending display labels.
- */
-export const LINE_ENDING_LABELS = {
-  crlf: 'CRLF',
-  lf: 'LF',
-  cr: 'CR',
-  mixed: 'Mixed',
-};
