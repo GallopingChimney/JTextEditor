@@ -1,13 +1,14 @@
 <script>
     import { untrack } from "svelte";
-    import { EditorView } from "@codemirror/view";
+    import { EditorView, highlightSpecialChars } from "@codemirror/view";
     import { EditorState, Compartment, Transaction } from "@codemirror/state";
     import { lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
-    import { openSearchPanel } from "@codemirror/search";
+    import { openSearchPanel, closeSearchPanel, searchPanelOpen } from "@codemirror/search";
     import { undo, redo } from "@codemirror/commands";
-    import { jteSetup } from "./lib/cm-setup.js";
+    import { jteSetup, detectIndent } from "./lib/cm-setup.js";
     import { loadLanguage } from "./lib/cm-languages.js";
-    import { invisiblesPlugin } from "./lib/cm-invisibles.js";
+    import { indentUnit } from "@codemirror/language";
+    import { indentationMarkers } from "@replit/codemirror-indentation-markers";
     import { buildContext } from "./lib/ai-context.js";
     import { getActions } from "./lib/ai-actions.js";
     import AiPrompt from "./AiPrompt.svelte";
@@ -19,6 +20,7 @@
         showLineNumbers = true,
         wordWrap = false,
         highlightLine = true,
+        showIndentGuides = true,
         onchange,
         oncursor,
         ai = null,
@@ -34,6 +36,28 @@
     const wrapCompartment = new Compartment();
     const activeLineCompartment = new Compartment();
     const invisiblesCompartment = new Compartment();
+    const indentGuidesCompartment = new Compartment();
+    const tabSizeCompartment = new Compartment();
+    const indentUnitCompartment = new Compartment();
+
+    function applyDetectedIndent(text) {
+        if (!view) return;
+        const detected = detectIndent(text);
+        view.dispatch({ effects: [
+            indentUnitCompartment.reconfigure(indentUnit.of(detected.unit)),
+            tabSizeCompartment.reconfigure(EditorState.tabSize.of(detected.tabSize)),
+        ]});
+    }
+
+    const indentGuidesExt = indentationMarkers({
+        thickness: 2,
+        colors: {
+            light: "#E0E0E0",
+            dark: "rgba(255, 255, 255, 0.08)",
+            activeLight: "#C0C0C0",
+            activeDark: "rgba(255, 255, 255, 0.18)",
+        },
+    });
 
     // Mount editor — only depends on `container`, reads props via untrack
     $effect(() => {
@@ -44,7 +68,9 @@
         const initialWrap = untrack(() => wordWrap);
         const initialHighlight = untrack(() => highlightLine);
         const initialInvisibles = untrack(() => showInvisibles);
+        const initialIndentGuides = untrack(() => showIndentGuides);
         const initialLang = untrack(() => language);
+        const detected = detectIndent(initialContent);
 
         const state = EditorState.create({
             doc: initialContent,
@@ -60,7 +86,10 @@
                 activeLineCompartment.of(
                     initialHighlight ? [highlightActiveLine(), highlightActiveLineGutter()] : [],
                 ),
-                invisiblesCompartment.of(initialInvisibles ? invisiblesPlugin : []),
+                invisiblesCompartment.of(initialInvisibles ? highlightSpecialChars() : []),
+                indentGuidesCompartment.of(initialIndentGuides ? indentGuidesExt : []),
+                tabSizeCompartment.of(EditorState.tabSize.of(detected.tabSize)),
+                indentUnitCompartment.of(indentUnit.of(detected.unit)),
                 EditorView.updateListener.of((update) => {
                     if (update.docChanged) {
                         lastEmitted = update.state.doc.toString();
@@ -104,6 +133,8 @@
                 changes: { from: 0, to: view.state.doc.length, insert: c },
             });
             lastEmitted = c;
+            // Re-detect indentation on full document swap
+            applyDetectedIndent(c);
         }
     });
 
@@ -143,12 +174,25 @@
     $effect(() => {
         if (!view) return;
         view.dispatch({
-            effects: invisiblesCompartment.reconfigure(showInvisibles ? invisiblesPlugin : []),
+            effects: invisiblesCompartment.reconfigure(showInvisibles ? highlightSpecialChars() : []),
+        });
+    });
+
+    $effect(() => {
+        if (!view) return;
+        view.dispatch({
+            effects: indentGuidesCompartment.reconfigure(showIndentGuides ? indentGuidesExt : []),
         });
     });
 
     export function focusSearch() {
         if (view) openSearchPanel(view);
+    }
+
+    export function toggleSearch() {
+        if (!view) return;
+        if (searchPanelOpen(view.state)) closeSearchPanel(view);
+        else openSearchPanel(view);
     }
 
     export function execCommand(cmd) {
@@ -265,27 +309,11 @@
 <style>
     .jte-cm-container {
         flex: 1;
+        position: relative;
         overflow: hidden;
-        display: flex;
     }
     .jte-cm-container :global(.cm-editor) {
-        flex: 1;
-    }
-    /* Invisible character styling */
-    .jte-cm-container :global(.jte-invisible) {
-        opacity: 0.4;
-        font-size: 0.85em;
-    }
-    .jte-cm-container :global(.jte-invisible-space) {
-        color: var(--jte-gutter-fg, #555);
-    }
-    .jte-cm-container :global(.jte-invisible-tab) {
-        color: var(--jte-gutter-fg, #555);
-    }
-    .jte-cm-container :global(.jte-invisible-control) {
-        color: #d16969;
-        background: rgba(209, 105, 105, 0.15);
-        border-radius: 2px;
-        padding: 0 2px;
+        position: absolute;
+        inset: 0;
     }
 </style>

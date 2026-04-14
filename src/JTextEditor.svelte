@@ -1,10 +1,13 @@
 <script>
+    import { untrack } from "svelte";
     import TopBar from "./TopBar.svelte";
     import TabBar from "./TabBar.svelte";
     import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
     import RichTextEditor from "./RichTextEditor.svelte";
+    import Settings from "./Settings.svelte";
     import { detectLineEnding, splitLines } from "./lib/characters.js";
     import { languages } from "./lib/languages.js";
+    import { detectIndent } from "./lib/cm-setup.js";
 
     let {
         tabs: initialTabs = [],
@@ -16,11 +19,15 @@
         onsaveAs = undefined,
         ontabchange = undefined,
         onsettingschange = undefined,
+        onsettings = undefined,
         onback = undefined,
         onclose = undefined,
         onminimize = undefined,
         onmaximize = undefined,
         onrename = undefined,
+        onlaunch = undefined,
+        onmodified = undefined,
+        ontabclose = undefined,
     } = $props();
 
     let nextId = $state(1);
@@ -32,29 +39,70 @@
     let activeTabId = $state(initialTabs[0]?.id || tabs[0]?.id || "");
     let activeTab = $derived(tabs.find((t) => t.id === activeTabId));
 
-    // Internal state — overridden by settings prop when present
+    // Internal state — synced from settings prop when present
     let _showInvisibles = $state(false);
     let _showLineNumbers = $state(true);
     let _wordWrap = $state(false);
     let _highlightLine = $state(true);
+    let _showIndentGuides = $state(true);
     let _theme = $state("dark");
     let _pageWidth = $state("normal");
     let _bgColor = $state("");
-    let _pageCanvasColor = $state("");
     let _pageColor = $state("");
+    let _fontFamily = $state("");
+    let _fontSize = $state("");
+    let _tabSize = $state(4);
+    let _lineHeight = $state("");
+    let _toolbarMode = $state("pinned");
 
-    let showInvisibles = $derived(settings.showInvisibles ?? _showInvisibles);
-    let showLineNumbers = $derived(settings.showLineNumbers ?? _showLineNumbers);
-    let wordWrap = $derived(settings.wordWrap ?? _wordWrap);
-    let highlightLine = $derived(settings.highlightLine ?? _highlightLine);
-    let theme = $derived(settings.theme ?? _theme);
-    let pageWidth = $derived(settings.pageWidth ?? _pageWidth);
-    let bgColor = $derived(settings.bgColor ?? _bgColor);
-    let pageCanvasColor = $derived(settings.pageCanvasColor ?? _pageCanvasColor);
-    let pageColor = $derived(settings.pageColor ?? _pageColor);
+    // Sync internal state from external settings prop
+    $effect(() => {
+        if (settings.showInvisibles != null) _showInvisibles = settings.showInvisibles;
+        if (settings.showLineNumbers != null) _showLineNumbers = settings.showLineNumbers;
+        if (settings.wordWrap != null) _wordWrap = settings.wordWrap;
+        if (settings.highlightLine != null) _highlightLine = settings.highlightLine;
+        if (settings.showIndentGuides != null) _showIndentGuides = settings.showIndentGuides;
+        if (settings.theme != null) _theme = settings.theme;
+        if (settings.pageWidth != null) _pageWidth = settings.pageWidth;
+        if (settings.bgColor != null) _bgColor = settings.bgColor;
+        if (settings.pageColor != null) _pageColor = settings.pageColor;
+        if (settings.fontFamily != null) _fontFamily = settings.fontFamily;
+        if (settings.fontSize != null) _fontSize = settings.fontSize;
+        if (settings.tabSize != null) _tabSize = settings.tabSize;
+        if (settings.lineHeight != null) _lineHeight = settings.lineHeight;
+        if (settings.toolbarMode != null) _toolbarMode = settings.toolbarMode;
+    });
+
+    // Derived values for reactivity in template
+    let showInvisibles = $derived(_showInvisibles);
+    let showLineNumbers = $derived(_showLineNumbers);
+    let wordWrap = $derived(_wordWrap);
+    let highlightLine = $derived(_highlightLine);
+    let showIndentGuides = $derived(_showIndentGuides);
+    let theme = $derived(_theme);
+    let pageWidth = $derived(_pageWidth);
+    let bgColor = $derived(_bgColor);
+    let pageColor = $derived(_pageColor);
+    let fontFamily = $derived(_fontFamily);
+    let fontSize = $derived(_fontSize);
+    let tabSize = $derived(_tabSize);
+    let lineHeight = $derived(_lineHeight);
+    let toolbarMode = $derived(_toolbarMode);
     let cursorLine = $state(1);
     let cursorCol = $state(1);
+    let indentLabel = $state("Spaces: 4");
+    $effect(() => {
+        // Re-detect only when the active tab changes, not on every keystroke
+        const _id = activeTabId; // tracked — re-runs on tab switch
+        const c = untrack(() => tabs.find(t => t.id === _id)?.content);
+        if (!c) { indentLabel = "Spaces: 4"; return; }
+        const d = detectIndent(c);
+        indentLabel = d.unit === "\t" ? `Tab Size: ${d.tabSize}` : `Spaces: ${d.unit.length}`;
+    });
     let editorRef = $state();
+    let settingsOpen = $state(false);
+
+
 
     let lineEnding = $derived(
         activeTab ? detectLineEnding(activeTab.content) : "lf",
@@ -71,7 +119,7 @@
             name: "Untitled",
             content: "",
             language: "",
-            mode: "rich",
+            mode: settings.defaultMode ?? "rich",
             modified: false,
             path: "",
             ...overrides,
@@ -87,6 +135,8 @@
     function closeTab(id) {
         const idx = tabs.findIndex((t) => t.id === id);
         if (idx === -1) return;
+        const removed = tabs[idx];
+        ontabclose?.(removed);
         tabs.splice(idx, 1);
         if (tabs.length === 0) newTab();
         else if (activeTabId === id)
@@ -96,8 +146,10 @@
     function handleChange(newContent) {
         const tab = tabs.find((t) => t.id === activeTabId);
         if (tab) {
+            const wasModified = tab.modified;
             tab.content = newContent;
             tab.modified = true;
+            if (!wasModified) onmodified?.(tab, true);
         }
     }
 
@@ -107,7 +159,7 @@
     }
 
     function notifySettings() {
-        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageCanvasColor, pageColor });
+        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, showIndentGuides, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, toolbarMode });
     }
 
     function handleRename(newName) {
@@ -137,9 +189,18 @@
             case "file.closeTab":
                 closeTab(activeTabId);
                 break;
+            case "file.settings":
+                settingsOpen = !settingsOpen;
+                onsettings?.();
+                break;
             case "edit.find":
-            case "edit.toggleFind":
                 editorRef?.focusSearch();
+                break;
+            case "edit.toggleFind":
+                editorRef?.toggleSearch();
+                break;
+            case "edit.copyAll":
+                navigator.clipboard.writeText(activeTab.content);
                 break;
             case "view.wordWrap":
                 _wordWrap = !_wordWrap;
@@ -155,6 +216,10 @@
                 break;
             case "view.invisibles":
                 _showInvisibles = !_showInvisibles;
+                notifySettings();
+                break;
+            case "view.indentGuides":
+                _showIndentGuides = !_showIndentGuides;
                 notifySettings();
                 break;
             case "view.toggleMode": {
@@ -176,9 +241,6 @@
             default:
                 if (action.startsWith("view.bgColor:")) {
                     _bgColor = action.split(":")[1];
-                    notifySettings();
-                } else if (action.startsWith("view.pageCanvasColor:")) {
-                    _pageCanvasColor = action.split(":")[1];
                     notifySettings();
                 } else if (action.startsWith("view.pageColor:")) {
                     _pageColor = action.split(":")[1];
@@ -220,6 +282,11 @@
             e.preventDefault();
             editorRef?.openAiPrompt?.();
         }
+        if (mod && e.key === ",") {
+            e.preventDefault();
+            settingsOpen = !settingsOpen;
+            onsettings?.();
+        }
     }
 
     export function openFile({ name, content, language = "", path = "" }) {
@@ -231,20 +298,37 @@
     export function markSaved(path) {
         const tab = tabs.find((t) => t.id === activeTabId);
         if (tab) {
+            const wasModified = tab.modified;
             tab.modified = false;
             if (path) {
                 tab.path = path;
                 tab.name = path.split(/[\\/]/).pop();
             }
+            if (wasModified) onmodified?.(tab, false);
         }
+    }
+
+    export function getActiveTab() {
+        return activeTab ? { ...activeTab } : null;
+    }
+
+    export function removeTab(id) {
+        closeTab(id);
+    }
+
+    export function openSettings() {
+        settingsOpen = true;
     }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="jte-root" data-theme={theme} onkeydown={handleKeydown}
-    style:--jte-bg={(isPlainMode ? bgColor : (pageWidth === 'full' ? pageColor : null)) || null}
-    style:--jte-page-canvas={pageCanvasColor || null}
-    style:--jte-page-color={(!isPlainMode && pageWidth !== 'full' ? pageColor : null) || null}>
+    style:--jte-bg={(isPlainMode ? bgColor : (pageWidth === 'full' ? pageColor : bgColor)) || null}
+    style:--jte-page-canvas={bgColor || null}
+    style:--jte-page-color={(!isPlainMode && pageWidth !== 'full' ? pageColor : null) || null}
+    style:--jte-font={fontFamily || null}
+    style:--jte-font-size={fontSize || null}
+    style:--jte-line-height={lineHeight || null}>
     {#if activeTab}
         <TopBar
             name={activeTab.name}
@@ -254,11 +338,11 @@
             {wordWrap}
             {showInvisibles}
             {highlightLine}
+            {showIndentGuides}
             {isPlainMode}
             {theme}
             {pageWidth}
             {bgColor}
-            {pageCanvasColor}
             {pageColor}
             {mode}
             onaction={handleAction}
@@ -267,31 +351,61 @@
             onclose={() => onclose?.()}
             onminimize={() => onminimize?.()}
             onmaximize={() => onmaximize?.()}
+            onlaunch={onlaunch ? () => onlaunch(activeTab) : undefined}
         />
 
         <div class="jte-editor-wrap">
-            {#if isPlainMode}
-                <CodeMirrorEditor
-                    bind:this={editorRef}
-                    content={activeTab.content}
-                    language={activeTab.language}
-                    {showInvisibles}
-                    {showLineNumbers}
-                    {wordWrap}
-                    {highlightLine}
-                    onchange={handleChange}
-                    oncursor={handleCursor}
-                    {ai}
-                />
-            {:else}
-                <RichTextEditor
-                    bind:this={editorRef}
-                    content={activeTab.content}
-                    onchange={handleChange}
-                    {pageWidth}
-                    {wordWrap}
-                    {ai}
-                />
+            <div class="jte-editor-main">
+                {#if isPlainMode}
+                    <CodeMirrorEditor
+                        bind:this={editorRef}
+                        content={activeTab.content}
+                        language={activeTab.language}
+                        {showInvisibles}
+                        {showLineNumbers}
+                        {wordWrap}
+                        {highlightLine}
+                        {showIndentGuides}
+                        onchange={handleChange}
+                        oncursor={handleCursor}
+                        {ai}
+                    />
+                {:else}
+                    <RichTextEditor
+                        bind:this={editorRef}
+                        content={activeTab.content}
+                        onchange={handleChange}
+                        {pageWidth}
+                        {wordWrap}
+                        {ai}
+                        toolbarPinned={toolbarMode === 'pinned' ? true : toolbarMode === 'bubble' ? false : undefined}
+                        ontoolbarpin={(p) => { _toolbarMode = p ? 'pinned' : 'bubble'; notifySettings(); }}
+                    />
+                {/if}
+            </div>
+            {#if settingsOpen}
+                <div class="jte-settings-sidebar">
+                    <Settings
+                        settings={{ showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, toolbarMode }}
+                        onsettingschange={(s) => {
+                            if (s.showInvisibles != null) _showInvisibles = s.showInvisibles;
+                            if (s.showLineNumbers != null) _showLineNumbers = s.showLineNumbers;
+                            if (s.wordWrap != null) _wordWrap = s.wordWrap;
+                            if (s.highlightLine != null) _highlightLine = s.highlightLine;
+                            if (s.theme != null) _theme = s.theme;
+                            if (s.pageWidth != null) _pageWidth = s.pageWidth;
+                            if (s.bgColor != null) _bgColor = s.bgColor;
+                            if (s.pageColor != null) _pageColor = s.pageColor;
+                            if (s.fontFamily != null) _fontFamily = s.fontFamily;
+                            if (s.fontSize != null) _fontSize = s.fontSize;
+                            if (s.tabSize != null) _tabSize = s.tabSize;
+                            if (s.lineHeight != null) _lineHeight = s.lineHeight;
+                            if (s.toolbarMode != null) _toolbarMode = s.toolbarMode;
+                            notifySettings();
+                        }}
+                        onclose={() => { settingsOpen = false; }}
+                    />
+                </div>
             {/if}
         </div>
 
@@ -322,9 +436,10 @@
                             <option value={val}>{label}</option>
                         {/each}
                     </select>
-                    <span class="jte-status">Ln {cursorLine}, Col {cursorCol}</span>
+                    <span class="jte-status" title="Line {cursorLine}, Column {cursorCol}">{cursorLine}:{cursorCol}</span>
                     <span class="jte-status">{totalLines} lines</span>
                     <span class="jte-status">{lineEnding.toUpperCase()}</span>
+                    <span class="jte-status">{indentLabel}</span>
                 {:else}
                     <span class="jte-status">Rich Text</span>
                 {/if}
@@ -404,7 +519,21 @@
         display: flex;
     }
 
-    .jte-bottom {
+    .jte-editor-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        position: relative;
+    }
+
+    .jte-settings-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        border-left: 1px solid var(--jte-border, #333);
+        overflow-y: auto;
+    }
+
+.jte-bottom {
         display: flex;
         align-items: top;
         justify-content: space-between;
@@ -455,6 +584,7 @@
     }
 
     .jte-lang-select option {
+        background: var(--jte-menubar-bg, #252525);
         color: var(--jte-toolbar-fg, #ccc);
     }
 

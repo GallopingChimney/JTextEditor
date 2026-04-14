@@ -1,12 +1,8 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { EditorState, Compartment } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { defaultKeymap, historyKeymap } from "@codemirror/commands";
-import { history } from "@codemirror/commands";
-import { bracketMatching, indentOnInput } from "@codemirror/language";
-import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { TextSelection, Selection } from "@tiptap/pm/state";
-import { jteThemeExtension } from "./cm-theme.js";
+import { jteSetup } from "./cm-setup.js";
 import { loadLanguage } from "./cm-languages.js";
 
 /**
@@ -27,19 +23,15 @@ class CodeBlockView {
             state: EditorState.create({
                 doc: node.textContent,
                 extensions: [
-                    jteThemeExtension,
-                    history(),
-                    indentOnInput(),
-                    bracketMatching(),
-                    closeBrackets(),
-                    keymap.of([
-                        ...this.codeMirrorKeymap(),
-                        ...closeBracketsKeymap,
-                        ...defaultKeymap,
-                        ...historyKeymap,
-                    ]),
+                    // Escape keymaps must come before defaults
+                    keymap.of(this.codeMirrorKeymap()),
+                    jteSetup({
+                        lineNums: false,
+                        activeLine: false,
+                        wordWrap: true,
+                        search: false,
+                    }),
                     langCompartment.of([]),
-                    EditorView.lineWrapping,
                     EditorView.updateListener.of((update) => this.forwardUpdate(update)),
                 ],
             }),

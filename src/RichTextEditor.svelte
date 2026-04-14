@@ -25,7 +25,7 @@
 	import SlashMenuPopup from "./SlashMenu.svelte";
 	import AiPrompt from "./AiPrompt.svelte";
 
-	let { content = "", onchange, pageWidth = "full", wordWrap = true, ai = null } = $props();
+	let { content = "", onchange, pageWidth = "full", wordWrap = true, ai = null, toolbarPinned = undefined, ontoolbarpin = undefined } = $props();
 
 	let editorEl = $state();
 	let bubbleEl = $state();
@@ -33,7 +33,8 @@
 	let lastEmitted = "";
 
 	let searchOpen = $state(false);
-	let pinned = $state(true);
+	let _pinned = $state(true);
+	let pinned = $derived(toolbarPinned ?? _pinned);
 	let editorTick = $state(0);
 
 	// Decorates empty textblocks within a selection so they show a thin highlight
@@ -199,10 +200,17 @@
 					codeBlock: false,
 				}),
 				// Mod-Shift-s conflicts with Save As — unbind strike shortcut
+				// Tab inserts indent in content instead of moving focus
 				Extension.create({
-					name: "strikeShortcutOverride",
+					name: "keyboardOverrides",
 					addKeyboardShortcuts() {
-						return { "Mod-Shift-s": () => false };
+						return {
+							"Mod-Shift-s": () => false,
+							"Tab": () => {
+								this.editor.commands.insertContent("\t");
+								return true;
+							},
+						};
 					},
 				}),
 				CodeBlockCM,
@@ -308,6 +316,13 @@
 		editor.extensionStorage.jteSearch?.showPanel?.();
 	}
 
+	export function toggleSearch() {
+		if (!editor) return;
+		const search = editor.extensionStorage.jteSearch;
+		if (search?.isVisible?.()) search.hidePanel?.();
+		else search?.showPanel?.();
+	}
+
 	// Sync content from parent (tab switch)
 	$effect(() => {
 		if (!editor) return;
@@ -322,13 +337,13 @@
 <!-- Hidden bubble menu element — Tiptap positions it via tippy -->
 <div bind:this={bubbleEl} style="visibility:hidden; position:absolute; z-index:100;">
 	{#if editor && !pinned}
-		<BubbleToolbar {editor} tick={editorTick} onpin={() => pinned = true} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
+		<BubbleToolbar {editor} tick={editorTick} onpin={() => { _pinned = true; ontoolbarpin?.(true); }} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
 	{/if}
 </div>
 
 <div class="jte-rich-wrap">
 	{#if pinned && editor}
-		<BubbleToolbar {editor} tick={editorTick} pinned={true} onpin={() => pinned = false} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
+		<BubbleToolbar {editor} tick={editorTick} pinned={true} onpin={() => { _pinned = false; ontoolbarpin?.(false); }} {aiActions} {aiGenerating} onaiaction={handleAiAction} onaistop={stopAi} />
 	{/if}
 	<div bind:this={editorEl} class="jte-rich-container" class:jte-page-view={pageWidth !== 'full'} class:jte-no-wrap={pageWidth === 'full' && !wordWrap} data-page-width={pageWidth}></div>
 </div>
@@ -440,7 +455,7 @@
 		border: 1px solid var(--jte-border, #333);
 		border-radius: 4px;
 		padding: 8px 12px;
-		font-family: var(--jte-font, "Cascadia Code", "Fira Code", "Consolas", monospace);
+		font-family: var(--jte-font, Consolas, 'Courier New', monospace);
 		font-size: 14px;
 		overflow-x: auto;
 	}
@@ -450,7 +465,7 @@
 		background: rgba(255, 255, 255, 0.08);
 		border-radius: 3px;
 		padding: 2px 4px;
-		font-family: var(--jte-font, "Cascadia Code", "Fira Code", "Consolas", monospace);
+		font-family: var(--jte-font, Consolas, 'Courier New', monospace);
 		font-size: 0.9em;
 	}
 

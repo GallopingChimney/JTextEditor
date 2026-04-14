@@ -7,11 +7,11 @@
     wordWrap = false,
     showInvisibles = false,
     highlightLine = true,
+    showIndentGuides = true,
     isPlainMode = true,
     theme = 'dark',
     pageWidth = 'full',
     bgColor = '',
-    pageCanvasColor = '',
     pageColor = '',
     mode = 'sidecar',
     onaction,
@@ -20,12 +20,14 @@
     onminimize,
     onmaximize,
     onrename,
+    onlaunch = undefined,
   } = $props();
 
   let openDropdown = $state(null);
   let barEl = $state();
   let editing = $state(false);
   let editEl = $state();
+  let pathCopied = $state(false);
 
   let breadcrumbDir = $derived.by(() => {
     if (!path) return '';
@@ -105,8 +107,8 @@
     {/if}
 
     <div class="jte-dd-wrap">
-      <button class="jte-tb" title="Menu" onclick={() => toggle('menu')}>
-        <span class="material-symbols-outlined">menu</span>
+      <button class="jte-tb jte-menu-btn" title="Menu" onclick={() => toggle('menu')}>
+        <span class="material-symbols-outlined">edit_document</span>
       </button>
       {#if openDropdown === 'menu'}
         <div class="jte-dropdown jte-dropdown-left">
@@ -125,6 +127,10 @@
           <div class="jte-dd-sep"></div>
           <button class="jte-dd-item" onclick={() => action('file.closeTab')}>
             <span class="material-symbols-outlined">close</span> Close Tab
+          </button>
+          <div class="jte-dd-sep"></div>
+          <button class="jte-dd-item" onclick={() => action('file.settings')}>
+            <span class="material-symbols-outlined">settings</span> Settings
           </button>
         </div>
       {/if}
@@ -146,6 +152,20 @@
         ondblclick={startEditing}
       >{breadcrumbFile}</span>{/if}{#if modified}<span class="jte-dirty">*</span>{/if}
     </span>
+    {#if path}
+      <button class="jte-tb jte-copy-path-btn" title="Copy file path" onclick={() => {
+        navigator.clipboard.writeText(path);
+        pathCopied = true;
+        setTimeout(() => pathCopied = false, 1500);
+      }}>
+        <span class="material-symbols-outlined">{pathCopied ? 'check' : 'content_copy'}</span>
+      </button>
+    {/if}
+    {#if onlaunch}
+      <button class="jte-tb jte-launch-btn" title="Open in separate window" onclick={() => onlaunch?.()}>
+        <span class="material-symbols-outlined">open_in_new</span>
+      </button>
+    {/if}
   </div>
 
   <div class="jte-top-right">
@@ -161,8 +181,12 @@
         <span class="jte-mode-label">{isPlainMode ? 'Code' : 'Rich Text'}</span>
       </button>
 
-      <button class="jte-tb" title="Find & Replace (Ctrl+F)" onclick={() => action('edit.find')}>
+      <button class="jte-tb" title="Find & Replace (Ctrl+F)" onclick={() => action('edit.toggleFind')}>
         <span class="material-symbols-outlined">search</span>
+      </button>
+
+      <button class="jte-tb" title="Copy all content" onclick={() => action('edit.copyAll')}>
+        <span class="material-symbols-outlined">content_copy</span>
       </button>
 
       <div class="jte-dd-wrap">
@@ -198,22 +222,29 @@
           {/if}
           <div class="jte-dd-sep"></div>
           <span class="jte-dd-label">Colors</span>
-          {#if isPlainMode}
-            <label class="jte-dd-color-row">
-              <span>Background</span>
+          <label class="jte-dd-color-row">
+            <span>Background</span>
+            <span class="jte-dd-color-controls">
+              {#if bgColor}
+                <button class="jte-dd-color-reset" title="Reset to default" onclick={(e) => { e.stopPropagation(); action('view.bgColor:'); }}>
+                  <span class="material-symbols-outlined">restart_alt</span>
+                </button>
+              {/if}
               <input type="color" value={bgColor || (theme === 'dark' ? '#1e1e1e' : '#ffffff')} oninput={(e) => liveAction('view.bgColor:' + e.target.value)} />
-            </label>
-          {:else}
+            </span>
+          </label>
+          {#if !isPlainMode}
             <label class="jte-dd-color-row">
               <span>Page</span>
-              <input type="color" value={pageColor || (theme === 'dark' ? '#252525' : '#f3f3f3')} oninput={(e) => liveAction('view.pageColor:' + e.target.value)} />
+              <span class="jte-dd-color-controls">
+                {#if pageColor}
+                  <button class="jte-dd-color-reset" title="Reset to default" onclick={(e) => { e.stopPropagation(); action('view.pageColor:'); }}>
+                    <span class="material-symbols-outlined">restart_alt</span>
+                  </button>
+                {/if}
+                <input type="color" value={pageColor || (theme === 'dark' ? '#252525' : '#f3f3f3')} oninput={(e) => liveAction('view.pageColor:' + e.target.value)} />
+              </span>
             </label>
-            {#if pageWidth !== 'full'}
-              <label class="jte-dd-color-row">
-                <span>Background</span>
-                <input type="color" value={pageCanvasColor || (theme === 'dark' ? '#181818' : '#e8e8e8')} oninput={(e) => liveAction('view.pageCanvasColor:' + e.target.value)} />
-              </label>
-            {/if}
           {/if}
           {#if isPlainMode}
             <div class="jte-dd-sep"></div>
@@ -231,6 +262,11 @@
               <span class="material-symbols-outlined" class:on={showInvisibles}>space_bar</span>
               Invisibles
               {#if showInvisibles}<span class="jte-check">&#10003;</span>{/if}
+            </button>
+            <button class="jte-dd-item" onclick={() => action('view.indentGuides')}>
+              <span class="material-symbols-outlined" class:on={showIndentGuides}>indent_decrease</span>
+              Indent Guides
+              {#if showIndentGuides}<span class="jte-check">&#10003;</span>{/if}
             </button>
           {/if}
         </div>
@@ -261,6 +297,7 @@
 <style>
   .jte-topbar {
     display: flex;
+    height: 30px;
     align-items: center;
     justify-content: space-between;
     padding: 3px 6px;
@@ -320,6 +357,36 @@
     font-weight: bold;
   }
 
+  .jte-copy-path-btn {
+    padding: 2px 3px;
+    margin-left: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .jte-top-left:hover .jte-copy-path-btn {
+    opacity: 1;
+  }
+
+  .jte-copy-path-btn .material-symbols-outlined {
+    font-size: 13px;
+  }
+
+  .jte-launch-btn {
+    padding: 2px 3px;
+    margin-left: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .jte-top-left:hover .jte-launch-btn {
+    opacity: 1;
+  }
+
+  .jte-launch-btn .material-symbols-outlined {
+    font-size: 14px;
+  }
+
   .jte-tb {
     display: flex;
     align-items: center;
@@ -336,6 +403,15 @@
   .jte-tb:hover {
     background: var(--jte-toolbar-hover, #333);
     color: var(--jte-fg, #d4d4d4);
+  }
+
+  .jte-menu-btn .material-symbols-outlined {
+    background: linear-gradient(135deg, #0097a7, #8bc34a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 22px;
+    font-variation-settings: 'wght' 350;
   }
 
   .jte-mode-toggle.active {
@@ -433,6 +509,34 @@
     cursor: pointer;
   }
 
+  .jte-dd-color-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .jte-dd-color-reset {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--jte-status-fg, #888);
+    cursor: pointer;
+  }
+
+  .jte-dd-color-reset .material-symbols-outlined {
+    font-size: 14px;
+  }
+
+  .jte-dd-color-reset:hover {
+    color: var(--jte-fg, #d4d4d4);
+  }
+
   .jte-dd-color-row input[type="color"] {
     width: 22px;
     height: 18px;
@@ -488,7 +592,9 @@
   .jte-topbar-app :global(button),
   .jte-topbar-app :global(select),
   .jte-topbar-app :global(input),
-  .jte-topbar-app :global([contenteditable]) {
+  .jte-topbar-app :global([contenteditable]),
+  .jte-topbar-app :global(.jte-dropdown),
+  .jte-topbar-app :global(.jte-breadcrumb) {
     -webkit-app-region: no-drag;
   }
 

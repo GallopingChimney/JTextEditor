@@ -99,7 +99,7 @@ export const TiptapSearch = Extension.create({
     },
 
     addStorage() {
-        return { showPanel: null };
+        return { showPanel: null, hidePanel: null, isVisible: () => false };
     },
 
     addProseMirrorPlugins() {
@@ -398,6 +398,8 @@ export const TiptapSearch = Extension.create({
                     editorView = view;
                     const panel = buildPanel(ext.editor);
                     ext.storage.showPanel = () => showPanel(ext.editor, "fixed");
+                    ext.storage.hidePanel = () => hidePanel(ext.editor);
+                    ext.storage.isVisible = () => visible;
                     containerEl = view.dom.closest(".jte-rich-container");
                     if (containerEl) {
                         containerEl.style.position = "relative";

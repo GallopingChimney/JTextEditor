@@ -13,7 +13,7 @@ export const jteTheme = EditorView.theme(
         },
         ".cm-content": {
             fontFamily:
-                'var(--jte-font, "Cascadia Code", "Fira Code", "Consolas", monospace)',
+                "var(--jte-font, Consolas, 'Courier New', monospace)",
             lineHeight: "var(--jte-line-height, 1.5)",
             padding: "8px 0",
             caretColor: "var(--jte-fg, #d4d4d4)",
@@ -24,9 +24,9 @@ export const jteTheme = EditorView.theme(
         ".cm-gutters": {
             backgroundColor: "var(--jte-bg, #1e1e1e)",
             color: "var(--jte-gutter-fg, #555)",
-            borderRight: "1px solid var(--jte-border, #333)",
+            borderRight: "none",
             fontFamily:
-                'var(--jte-font, "Cascadia Code", "Fira Code", "Consolas", monospace)',
+                "var(--jte-font, Consolas, 'Courier New', monospace)",
             fontSize: "var(--jte-font-size, 14px)",
             lineHeight: "var(--jte-line-height, 1.5)",
         },
@@ -130,7 +130,7 @@ export const jteTheme = EditorView.theme(
         // Scrollbars
         ".cm-scroller": {
             fontFamily:
-                'var(--jte-font, "Cascadia Code", "Fira Code", "Consolas", monospace)',
+                "var(--jte-font, Consolas, 'Courier New', monospace)",
             overflow: "auto",
         },
         ".cm-scroller::-webkit-scrollbar": {
@@ -152,10 +152,7 @@ export const jteTheme = EditorView.theme(
         ".cm-scroller::-webkit-scrollbar-corner": {
             background: "transparent",
         },
-        // Tab size
-        ".cm-content, .cm-line": {
-            tabSize: "var(--jte-tab-size, 4)",
-        },
+        // Tab size is driven by EditorState.tabSize facet (set via tabSize prop on CodeMirrorEditor)
     },
     { dark: true },
 );

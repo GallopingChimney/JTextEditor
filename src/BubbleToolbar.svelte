@@ -13,12 +13,10 @@
 		{ label: "24", value: "24px" },
 	];
 	const fontFamilies = [
+		{ label: "Default", value: "" },
 		{ label: "Sans Serif", value: "system-ui, -apple-system, sans-serif" },
 		{ label: "Serif", value: 'Georgia, "Times New Roman", serif' },
-		{ label: "Mono", value: '"Cascadia Code", Consolas, monospace' },
-		{ label: "Arial", value: "Arial, Helvetica, sans-serif" },
-		{ label: "Georgia", value: "Georgia, serif" },
-		{ label: "Verdana", value: "Verdana, Geneva, sans-serif" },
+		{ label: "Monospace", value: 'Consolas, "Courier New", monospace' },
 	];
 
 	// Swatch presets
@@ -673,6 +671,8 @@
 		padding: 4px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 		z-index: 100;
+		font-family: var(--jte-ui-font, system-ui, -apple-system, sans-serif);
+		font-size: 12px;
 	}
 
 	.jte-bb-dd-item {
@@ -863,6 +863,7 @@
 		padding: 2px 6px;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+		font-family: inherit;
 	}
 
 	.jte-bb-spacing-row {
@@ -877,9 +878,9 @@
 		border: 1px solid var(--jte-border, #444);
 		border-radius: 3px;
 		color: var(--jte-toolbar-fg, #aaa);
-		font-size: 11px;
+		font-size: 12px;
 		cursor: pointer;
-		font-family: var(--jte-ui-font, system-ui, sans-serif);
+		font-family: inherit;
 		line-height: 1;
 	}
 
