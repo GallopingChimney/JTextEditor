@@ -334,16 +334,7 @@
             name={activeTab.name}
             path={activeTab.path}
             modified={activeTab.modified}
-            {showLineNumbers}
-            {wordWrap}
-            {showInvisibles}
-            {highlightLine}
-            {showIndentGuides}
             {isPlainMode}
-            {theme}
-            {pageWidth}
-            {bgColor}
-            {pageColor}
             {mode}
             onaction={handleAction}
             onrename={handleRename}
@@ -366,6 +357,9 @@
                         {wordWrap}
                         {highlightLine}
                         {showIndentGuides}
+                        {fontSize}
+                        {fontFamily}
+                        {lineHeight}
                         onchange={handleChange}
                         oncursor={handleCursor}
                         {ai}

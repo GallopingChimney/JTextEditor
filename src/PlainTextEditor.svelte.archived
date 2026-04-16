@@ -498,6 +498,7 @@
     .jte-textarea.has-overlay {
         color: transparent;
         caret-color: var(--jte-fg, #d4d4d4);
+        caret-width: 5px;
     }
 
     .jte-overlay {

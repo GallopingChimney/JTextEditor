@@ -299,6 +299,53 @@
 					}
 					return false;
 				},
+				handleDrop: (view, event, _slice, moved) => {
+					if (moved || !event.dataTransfer?.files?.length) return false;
+					const images = [...event.dataTransfer.files].filter(f => f.type.startsWith("image/"));
+					if (!images.length) return false;
+					event.preventDefault();
+					const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+					if (!coords) return false;
+					Promise.all(images.map(f => new Promise(resolve => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(reader.result);
+						reader.readAsDataURL(f);
+					}))).then(srcs => {
+						const { schema } = view.state;
+						let { tr } = view.state;
+						let pos = coords.pos;
+						for (const src of srcs) {
+							const node = schema.nodes.image.create({ src });
+							tr = tr.insert(pos, node);
+							pos += node.nodeSize;
+						}
+						view.dispatch(tr);
+					});
+					return true;
+				},
+				handlePaste: (view, event) => {
+					const items = event.clipboardData?.items;
+					if (!items) return false;
+					const images = [...items].filter(i => i.type.startsWith("image/"));
+					if (!images.length) return false;
+					event.preventDefault();
+					Promise.all(images.map(i => new Promise(resolve => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(reader.result);
+						reader.readAsDataURL(i.getAsFile());
+					}))).then(srcs => {
+						const { schema } = view.state;
+						let { tr } = view.state;
+						let pos = view.state.selection.from;
+						for (const src of srcs) {
+							const node = schema.nodes.image.create({ src });
+							tr = tr.insert(pos, node);
+							pos += node.nodeSize;
+						}
+						view.dispatch(tr);
+					});
+					return true;
+				},
 			},
 		});
 

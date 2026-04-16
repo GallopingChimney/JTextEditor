@@ -21,6 +21,9 @@
         wordWrap = false,
         highlightLine = true,
         showIndentGuides = true,
+        fontSize = "",
+        fontFamily = "",
+        lineHeight = "",
         onchange,
         oncursor,
         ai = null,
@@ -183,6 +186,12 @@
         view.dispatch({
             effects: indentGuidesCompartment.reconfigure(showIndentGuides ? indentGuidesExt : []),
         });
+    });
+
+    // Re-measure when font-related CSS variables change so gutters update
+    $effect(() => {
+        fontSize; fontFamily; lineHeight;
+        if (view) view.requestMeasure();
     });
 
     export function focusSearch() {
