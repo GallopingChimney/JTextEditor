@@ -52,7 +52,7 @@
 
 	const OVERSCAN = 5;
 
-	let rowH = $state(22);
+	let rowH = $state(26);
 	let scrollTop = $state(0);
 	let viewportH = $state(0);
 	let scrollEl: HTMLDivElement | undefined = $state();
@@ -256,16 +256,17 @@
 	onkeydown={onKeydown}
 >
 	<!-- Header (VSCode-style) -->
-	<div class="flex items-center h-5.5 px-2 shrink-0 group/hdr">
+	<div class="flex items-center h-8 px-2 py-1.5 shrink-0 group/hdr gap-1.5">
+		<span class="material-symbols-outlined text-[18px] text-yellow-500/70 shrink-0">folder</span>
 		{#if editingRoot}
 			<input
-				class="flex-1 bg-neutral-800 text-[11px] text-neutral-100 px-1.5 h-4.5 rounded outline-none border border-blue-500/60"
+				class="flex-1 min-w-0 bg-neutral-800 text-[13px] text-neutral-100 px-1.5 h-6 rounded outline-none border border-blue-500/60"
 				bind:value={rootInput}
 				use:autoFocus
 				onblur={commitRoot}
 			/>
 		{:else}
-			<span class="text-[11px] font-semibold text-neutral-400 uppercase tracking-wide truncate flex-1">{tree.root}</span>
+			<span class="text-[13px] font-medium text-neutral-200 truncate flex-1 min-w-0">{tree.root}</span>
 			<div class="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
 				<button
 					class="p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-neutral-200"
@@ -337,19 +338,19 @@
 	<button
 		type="button"
 		data-node-id={node.id}
-		class="flex items-center h-5.5 pr-1 cursor-pointer group w-full text-left
+		class="jte-tree-row flex items-center h-7 pr-1.5 cursor-pointer group w-full text-left gap-0.5
 			{isSelected ? 'bg-blue-500/20 text-neutral-100' : 'hover:bg-white/4 text-neutral-300'}
 			{isDragSource ? 'opacity-40' : ''}
 			{isDropHere && dropTarget?.valid ? 'bg-blue-500/15 outline-1 outline-blue-400/50' : ''}
 			{isDropHere && !dropTarget?.valid ? 'bg-red-500/10 outline-1 outline-red-400/30' : ''}"
-		style="padding-left: {depth * 10 + 4}px;"
+		style="padding-left: {depth * 12 + 6}px;"
 		onclick={() => { tree.select(node.id); if (isFolder) tree.toggle(node.id); }}
 		ondblclick={() => { if (!isFolder && onfileopen) onfileopen(node); }}
 		onpointerdown={(e: PointerEvent) => { if (e.button === 0) onDragStart(e, node.id); }}
 	>
 		<!-- Chevron -->
 		<span
-			class="w-4 h-4 flex items-center justify-center shrink-0"
+			class="w-5 h-5 flex items-center justify-center shrink-0"
 			role="button"
 			tabindex="-1"
 			onclick={(e: MouseEvent) => {
@@ -361,7 +362,7 @@
 		>
 			{#if isFolder}
 				<span
-					class="material-symbols-outlined text-[14px] text-neutral-500 transition-transform duration-100
+					class="material-symbols-outlined text-[16px] text-neutral-500 transition-transform duration-100
 						{isExpanded ? 'rotate-90' : ''}"
 				>chevron_right</span>
 			{/if}
@@ -369,12 +370,12 @@
 
 		<!-- Icon -->
 		{#if isFolder}
-			<span class="material-symbols-outlined text-[16px] mr-1.5 shrink-0
+			<span class="material-symbols-outlined text-[18px] mr-1.5 shrink-0
 				{isExpanded ? 'text-yellow-400/80' : 'text-yellow-500/60'}">
 				{isExpanded ? 'folder_open' : 'folder'}
 			</span>
 		{:else}
-			<span class="w-4 h-4 mr-1.5 shrink-0 flex items-center justify-center">
+			<span class="jte-file-icon w-5 h-5 mr-1.5 shrink-0 flex items-center justify-center">
 				{@html fileIconSvg(node.name || 'file')}
 			</span>
 		{/if}
@@ -382,8 +383,8 @@
 		<!-- Name / edit input -->
 		{#if isEditing}
 			<input
-				class="flex-1 min-w-0 bg-neutral-800 text-xs text-neutral-100 px-1 rounded outline-none
-					border border-blue-500/60 h-4.5 -my-px"
+				class="flex-1 min-w-0 bg-neutral-800 text-[13px] text-neutral-100 px-1 rounded outline-none
+					border border-blue-500/60 h-5.5 -my-px"
 				bind:value={tree.editValue}
 				use:autoFocus
 				onblur={() => tree.commitEdit()}
@@ -393,7 +394,7 @@
 		{:else}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<span
-				class="text-xs truncate flex-1 min-w-0 {node.name ? '' : 'italic text-neutral-600'}"
+				class="text-[13px] truncate flex-1 min-w-0 {node.name ? '' : 'italic text-neutral-600'}"
 				ondblclick={(e: MouseEvent) => {
 					e.stopPropagation();
 					if (!isFolder && onfileopen) onfileopen(node);
@@ -411,8 +412,19 @@
 				onclick={(e: MouseEvent) => { e.stopPropagation(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); }}
 				onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') { e.stopPropagation(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); } }}
 			>
-				<span class="material-symbols-outlined text-[12px]">close</span>
+				<span class="material-symbols-outlined text-[14px]">close</span>
 			</span>
 		{/if}
 	</button>
 {/snippet}
+
+<style>
+	/* material-file-icons SVGs declare style="width:100%;height:100%".
+	   Hard-clamp them to their wrapper so a missing size class can never
+	   let them balloon to intrinsic size. */
+	.jte-file-icon :global(svg) {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>

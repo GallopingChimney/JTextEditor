@@ -5,6 +5,9 @@
     modified = false,
     isPlainMode = true,
     mode = 'sidecar',
+    hasTree = false,
+    treeOpen = false,
+    ontoggletree = undefined,
     onaction,
     onback,
     onclose,
@@ -91,6 +94,17 @@
     {#if mode === 'sidecar'}
       <button class="jte-tb" title="Back" onclick={() => onback?.()}>
         <span class="material-symbols-outlined">chevron_left</span>
+      </button>
+    {/if}
+
+    {#if hasTree}
+      <button
+        class="jte-tb jte-tree-toggle-btn"
+        class:active={treeOpen}
+        title={treeOpen ? 'Hide Explorer' : 'Show Explorer'}
+        onclick={() => ontoggletree?.()}
+      >
+        <span class="material-symbols-outlined">side_navigation</span>
       </button>
     {/if}
 
@@ -342,6 +356,17 @@
   }
 
   .jte-tb .material-symbols-outlined { font-size: 16px; }
+
+  .jte-tree-toggle-btn .material-symbols-outlined {
+    font-size: 20px;
+    font-weight: 300;
+  }
+  .jte-tree-toggle-btn {
+    color: var(--jte-status-fg, #888);
+  }
+  .jte-tree-toggle-btn.active {
+    color: var(--jte-fg, #d4d4d4);
+  }
 
   .jte-top-sep {
     width: 1px;

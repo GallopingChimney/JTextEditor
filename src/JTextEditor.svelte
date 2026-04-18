@@ -109,6 +109,35 @@
     let editorRef = $state();
     let settingsOpen = $state(false);
     let treeOpen = $state(true);
+    let treeWidth = $state(240);
+    const TREE_MIN_W = 42;
+    const TREE_MAX_W = 520;
+    const TREE_SNAP_CLOSE = 30;
+    let treeResizing = $state(false);
+    let treeResizeStartX = 0;
+    let treeResizeStartW = 0;
+
+    function onTreeResizeDown(e) {
+        e.preventDefault();
+        treeResizing = true;
+        treeResizeStartX = e.clientX;
+        treeResizeStartW = treeWidth;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    function onTreeResizeMove(e) {
+        if (!treeResizing) return;
+        const target = treeResizeStartW + e.clientX - treeResizeStartX;
+        if (target < TREE_SNAP_CLOSE) {
+            treeOpen = false;
+            treeWidth = 240;
+            treeResizing = false;
+            return;
+        }
+        treeWidth = Math.max(TREE_MIN_W, Math.min(TREE_MAX_W, target));
+    }
+    function onTreeResizeUp() {
+        treeResizing = false;
+    }
 
 
 
@@ -344,6 +373,9 @@
             modified={activeTab.modified}
             {isPlainMode}
             {mode}
+            hasTree={!!tree}
+            {treeOpen}
+            ontoggletree={() => treeOpen = !treeOpen}
             onaction={handleAction}
             onrename={handleRename}
             onback={() => onback?.()}
@@ -355,9 +387,17 @@
 
         <div class="jte-editor-wrap">
             {#if tree && treeOpen}
-                <div class="jte-tree-sidebar">
-                    <TreeView {tree} {onfileopen} {onrequestdelete} />
+                <div class="jte-tree-sidebar" style="width:{treeWidth}px;">
+                    <TreeView {tree} width={treeWidth} {onfileopen} {onrequestdelete} />
                 </div>
+                <div
+                    class="jte-tree-resize"
+                    class:jte-tree-resize-active={treeResizing}
+                    role="separator"
+                    onpointerdown={onTreeResizeDown}
+                    onpointermove={onTreeResizeMove}
+                    onpointerup={onTreeResizeUp}
+                ></div>
             {/if}
             <div class="jte-editor-main">
                 {#if isPlainMode}
@@ -431,16 +471,6 @@
                 />
             </div>
             <div class="jte-bottom-right">
-                {#if tree}
-                    <button
-                        class="jte-tree-toggle"
-                        class:jte-tree-toggle-active={treeOpen}
-                        title={treeOpen ? 'Hide Explorer' : 'Show Explorer'}
-                        onclick={() => treeOpen = !treeOpen}
-                    >
-                        <span class="material-symbols-outlined">folder_open</span>
-                    </button>
-                {/if}
                 {#if isPlainMode}
                     <select
                         class="jte-lang-select"
@@ -546,25 +576,26 @@
     }
 
     .jte-tree-sidebar {
-        width: 240px;
         flex-shrink: 0;
         border-right: 1px solid var(--jte-border, #333);
         overflow: hidden;
-        background: var(--jte-bg, #1e1e1e);
+        background: var(--jte-bg, #272727);
     }
 
-    .jte-tree-toggle {
-        background: none;
-        border: none;
-        color: var(--jte-status-fg, #888);
-        cursor: pointer;
-        padding: 0 2px;
-        display: flex;
-        align-items: center;
+    .jte-tree-resize {
+        width: 4px;
+        margin-left: -2px;
+        margin-right: -2px;
+        flex-shrink: 0;
+        cursor: col-resize;
+        background: transparent;
+        transition: background 0.12s;
+        z-index: 5;
     }
-    .jte-tree-toggle .material-symbols-outlined { font-size: 16px; }
-    .jte-tree-toggle:hover { color: var(--jte-fg, #d4d4d4); }
-    .jte-tree-toggle-active { color: var(--jte-fg, #d4d4d4); }
+    .jte-tree-resize:hover,
+    .jte-tree-resize-active {
+        background: rgba(59, 130, 246, 0.35);
+    }
 
     .jte-settings-sidebar {
         width: 280px;
