@@ -5,6 +5,7 @@
     import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
     import RichTextEditor from "./RichTextEditor.svelte";
     import Settings from "./Settings.svelte";
+    import TreeView from "./tree/TreeView.svelte";
     import { detectLineEnding, splitLines } from "./lib/characters.js";
     import { languages } from "./lib/languages.js";
     import { detectIndent } from "./lib/cm-setup.js";
@@ -28,6 +29,9 @@
         onlaunch = undefined,
         onmodified = undefined,
         ontabclose = undefined,
+        tree = undefined,
+        onfileopen = undefined,
+        onrequestdelete = undefined,
     } = $props();
 
     let nextId = $state(1);
@@ -53,6 +57,7 @@
     let _fontSize = $state("");
     let _tabSize = $state(4);
     let _lineHeight = $state("");
+    let _defaultMode = $state("rich");
     let _toolbarMode = $state("pinned");
 
     // Sync internal state from external settings prop
@@ -70,6 +75,7 @@
         if (settings.fontSize != null) _fontSize = settings.fontSize;
         if (settings.tabSize != null) _tabSize = settings.tabSize;
         if (settings.lineHeight != null) _lineHeight = settings.lineHeight;
+        if (settings.defaultMode != null) _defaultMode = settings.defaultMode;
         if (settings.toolbarMode != null) _toolbarMode = settings.toolbarMode;
     });
 
@@ -87,6 +93,7 @@
     let fontSize = $derived(_fontSize);
     let tabSize = $derived(_tabSize);
     let lineHeight = $derived(_lineHeight);
+    let defaultMode = $derived(_defaultMode);
     let toolbarMode = $derived(_toolbarMode);
     let cursorLine = $state(1);
     let cursorCol = $state(1);
@@ -101,6 +108,7 @@
     });
     let editorRef = $state();
     let settingsOpen = $state(false);
+    let treeOpen = $state(true);
 
 
 
@@ -119,7 +127,7 @@
             name: "Untitled",
             content: "",
             language: "",
-            mode: settings.defaultMode ?? "rich",
+            mode: defaultMode || "rich",
             modified: false,
             path: "",
             ...overrides,
@@ -159,7 +167,7 @@
     }
 
     function notifySettings() {
-        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, showIndentGuides, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, toolbarMode });
+        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, showIndentGuides, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, defaultMode, toolbarMode });
     }
 
     function handleRename(newName) {
@@ -346,6 +354,11 @@
         />
 
         <div class="jte-editor-wrap">
+            {#if tree && treeOpen}
+                <div class="jte-tree-sidebar">
+                    <TreeView {tree} {onfileopen} {onrequestdelete} />
+                </div>
+            {/if}
             <div class="jte-editor-main">
                 {#if isPlainMode}
                     <CodeMirrorEditor
@@ -380,7 +393,7 @@
             {#if settingsOpen}
                 <div class="jte-settings-sidebar">
                     <Settings
-                        settings={{ showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, toolbarMode }}
+                        settings={{ showInvisibles, showLineNumbers, wordWrap, highlightLine, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, defaultMode, toolbarMode }}
                         onsettingschange={(s) => {
                             if (s.showInvisibles != null) _showInvisibles = s.showInvisibles;
                             if (s.showLineNumbers != null) _showLineNumbers = s.showLineNumbers;
@@ -394,6 +407,7 @@
                             if (s.fontSize != null) _fontSize = s.fontSize;
                             if (s.tabSize != null) _tabSize = s.tabSize;
                             if (s.lineHeight != null) _lineHeight = s.lineHeight;
+                            if (s.defaultMode != null) _defaultMode = s.defaultMode;
                             if (s.toolbarMode != null) _toolbarMode = s.toolbarMode;
                             notifySettings();
                         }}
@@ -417,6 +431,16 @@
                 />
             </div>
             <div class="jte-bottom-right">
+                {#if tree}
+                    <button
+                        class="jte-tree-toggle"
+                        class:jte-tree-toggle-active={treeOpen}
+                        title={treeOpen ? 'Hide Explorer' : 'Show Explorer'}
+                        onclick={() => treeOpen = !treeOpen}
+                    >
+                        <span class="material-symbols-outlined">folder_open</span>
+                    </button>
+                {/if}
                 {#if isPlainMode}
                     <select
                         class="jte-lang-select"
@@ -480,6 +504,7 @@
         --jte-selection: rgba(0, 120, 215, 0.35);
         --jte-selection-focused: rgba(0, 120, 215, 0.5);
         --jte-active-line: rgba(0, 0, 0, 0.04);
+        --jte-input-bg: #ffffff;
         --jte-input-focus-bg: #ffffff;
         --jte-search-match: rgba(255, 200, 0, 0.4);
         --jte-search-match-active: rgba(255, 150, 0, 0.6);
@@ -519,6 +544,27 @@
         display: flex;
         position: relative;
     }
+
+    .jte-tree-sidebar {
+        width: 240px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--jte-border, #333);
+        overflow: hidden;
+        background: var(--jte-bg, #1e1e1e);
+    }
+
+    .jte-tree-toggle {
+        background: none;
+        border: none;
+        color: var(--jte-status-fg, #888);
+        cursor: pointer;
+        padding: 0 2px;
+        display: flex;
+        align-items: center;
+    }
+    .jte-tree-toggle .material-symbols-outlined { font-size: 16px; }
+    .jte-tree-toggle:hover { color: var(--jte-fg, #d4d4d4); }
+    .jte-tree-toggle-active { color: var(--jte-fg, #d4d4d4); }
 
     .jte-settings-sidebar {
         width: 280px;

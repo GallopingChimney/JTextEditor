@@ -482,7 +482,7 @@
 		border: 1px solid var(--jte-border, #3a3a3a);
 		border-radius: 6px;
 		overflow: hidden;
-		background: var(--jte-bg, #1e1e1e);
+		background: var(--jte-input-bg, #1e1e1e);
 	}
 
 	.jte-s-seg button {
@@ -522,7 +522,7 @@
 	/* Select */
 	.jte-s-select {
 		height: 28px;
-		background: var(--jte-bg, #1e1e1e);
+		background: var(--jte-input-bg, #1e1e1e);
 		border: 1px solid var(--jte-border, #3a3a3a);
 		border-radius: 6px;
 		color: var(--jte-fg, #d4d4d4);
@@ -551,7 +551,7 @@
 		border: 1px solid var(--jte-border, #3a3a3a);
 		border-radius: 6px;
 		overflow: hidden;
-		background: var(--jte-bg, #1e1e1e);
+		background: var(--jte-input-bg, #1e1e1e);
 	}
 
 	.jte-s-num-btn {
@@ -599,7 +599,7 @@
 	/* Text input */
 	.jte-s-input {
 		height: 28px;
-		background: var(--jte-bg, #1e1e1e);
+		background: var(--jte-input-bg, #1e1e1e);
 		border: 1px solid var(--jte-border, #3a3a3a);
 		border-radius: 6px;
 		color: var(--jte-fg, #d4d4d4);

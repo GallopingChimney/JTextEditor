@@ -66,6 +66,7 @@
     "@tiptap/pm": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
     "codemirror": "^6.0.2",
+    "material-file-icons": "^2.4.0",
     "vanilla-colorful": "^0.7.2"
   },
   "devDependencies": {
