@@ -426,6 +426,7 @@
 		overflow: auto;
 		display: flex;
 		flex-direction: column;
+		zoom: var(--jte-zoom, 1);
 	}
 
 	.jte-rich-container :global(.tiptap) {

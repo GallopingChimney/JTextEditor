@@ -664,13 +664,13 @@
 		left: 2px;
 		width: 12px;
 		height: 12px;
-		background: var(--jte-fg, #d4d4d4);
+		background: #fff;
 		border-radius: 50%;
 		transition: transform 0.2s;
 	}
 
 	.jte-s-toggle:checked {
-		background: var(--jte-accent, #569cd6);
+		background: #3b82f6;
 	}
 
 	.jte-s-toggle:checked::after {
@@ -761,7 +761,7 @@
 
 	/* Scrollbar — thin thumb hugging right edge, full-width hover target */
 	.jte-s-scroll::-webkit-scrollbar {
-		width: 6px;
+		width: 10px;
 	}
 
 	.jte-s-scroll::-webkit-scrollbar-track {
@@ -770,14 +770,14 @@
 
 	.jte-s-scroll::-webkit-scrollbar-thumb {
 		background: var(--jte-scrollbar-thumb, rgba(255, 255, 255, 0.2));
-		border-radius: 3px;
-		border-left: 3px solid transparent;
+		border-radius: 5px;
+		border: 3px solid transparent;
 		background-clip: padding-box;
 	}
 
 	.jte-s-scroll::-webkit-scrollbar-thumb:hover {
 		background: var(--jte-scrollbar-thumb-hover, rgba(255, 255, 255, 0.35));
-		border-left: 3px solid transparent;
+		border: 3px solid transparent;
 		background-clip: padding-box;
 	}
 </style>

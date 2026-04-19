@@ -110,29 +110,29 @@
 
     <div class="jte-dd-wrap">
       <button class="jte-tb jte-menu-btn" title="Menu" onclick={() => toggle('menu')}>
-        <span class="material-symbols-outlined">edit_document</span>
+        <span class="material-symbols-outlined">menu</span>
       </button>
       {#if openDropdown === 'menu'}
         <div class="jte-dropdown jte-dropdown-left">
           <button class="jte-dd-item" onclick={() => action('file.new')}>
-            <span class="material-symbols-outlined">note_add</span> New
+            <span class="material-symbols-outlined">note_add</span> New <span class="jte-dd-shortcut">Ctrl+N</span>
           </button>
           <button class="jte-dd-item" onclick={() => action('file.open')}>
-            <span class="material-symbols-outlined">folder_open</span> Open
+            <span class="material-symbols-outlined">folder_open</span> Open <span class="jte-dd-shortcut">Ctrl+O</span>
           </button>
           <button class="jte-dd-item" onclick={() => action('file.save')}>
-            <span class="material-symbols-outlined">save</span> Save
+            <span class="material-symbols-outlined">save</span> Save <span class="jte-dd-shortcut">Ctrl+S</span>
           </button>
           <button class="jte-dd-item" onclick={() => action('file.saveAs')}>
-            <span class="material-symbols-outlined">save_as</span> Save As
+            <span class="material-symbols-outlined">save_as</span> Save As <span class="jte-dd-shortcut">Ctrl+Shift+S</span>
           </button>
           <div class="jte-dd-sep"></div>
           <button class="jte-dd-item" onclick={() => action('file.closeTab')}>
-            <span class="material-symbols-outlined">close</span> Close Tab
+            <span class="material-symbols-outlined">close</span> Close Tab <span class="jte-dd-shortcut">Ctrl+W</span>
           </button>
           <div class="jte-dd-sep"></div>
           <button class="jte-dd-item" onclick={() => action('file.settings')}>
-            <span class="material-symbols-outlined">settings</span> Settings
+            <span class="material-symbols-outlined">settings</span> Settings <span class="jte-dd-shortcut">Ctrl+,</span>
           </button>
         </div>
       {/if}
@@ -328,12 +328,7 @@
   }
 
   .jte-menu-btn .material-symbols-outlined {
-    background: linear-gradient(135deg, #0097a7, #8bc34a);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-size: 22px;
-    font-variation-settings: 'wght' 350;
+    font-size: 20px;
   }
 
   .jte-mode-toggle.active {
@@ -412,6 +407,12 @@
 
   .jte-dd-item:hover { background: var(--jte-toolbar-hover, #333); }
   .jte-dd-item .material-symbols-outlined { font-size: 16px; }
+  .jte-dd-shortcut {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--jte-status-fg, #666);
+    font-family: var(--jte-ui-font, system-ui, sans-serif);
+  }
   .jte-dd-sep {
     height: 1px;
     background: var(--jte-border, #333);

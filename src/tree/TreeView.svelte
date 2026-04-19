@@ -7,13 +7,19 @@
 	let {
 		tree,
 		width = 240,
+		theme = 'dark',
 		onfileopen,
 		onrequestdelete,
+		onsetroot,
+		oncopypath,
 	}: {
 		tree: TreeState;
 		width?: number;
+		theme?: 'dark' | 'light';
 		onfileopen?: (node: TreeNode) => void;
 		onrequestdelete?: (node: TreeNode) => void;
+		onsetroot?: () => void;
+		oncopypath?: (path: string) => void;
 	} = $props();
 
 	// --- File icons (extensible) ---
@@ -24,22 +30,6 @@
 		const ext = filename.split('.').pop()?.toLowerCase() ?? '';
 		const custom = CUSTOM_ICONS.find(i => i.extensions?.includes(ext));
 		return (custom ?? getIcon(filename)).svg;
-	}
-
-	// --- Root inline edit ---
-
-	let editingRoot = $state(false);
-	let rootInput = $state('');
-
-	function startEditRoot() {
-		rootInput = tree.root;
-		editingRoot = true;
-	}
-
-	function commitRoot() {
-		const v = rootInput.trim();
-		if (v) tree.setRoot(v);
-		editingRoot = false;
 	}
 
 	// --- Svelte action: auto-focus + select ---
@@ -95,11 +85,6 @@
 		if (tree.editing) {
 			if (e.key === 'Enter') { e.preventDefault(); tree.commitEdit(); }
 			else if (e.key === 'Escape') { e.preventDefault(); tree.cancelEdit(); }
-			return;
-		}
-		if (editingRoot) {
-			if (e.key === 'Enter') { e.preventDefault(); commitRoot(); }
-			else if (e.key === 'Escape') { e.preventDefault(); editingRoot = false; }
 			return;
 		}
 
@@ -217,6 +202,64 @@
 		drag = null;
 		dropTarget = null;
 	}
+
+	// --- Context menu ---
+
+	type CtxItem = { label: string; icon: string; action: () => void; separator?: false }
+		| { separator: true };
+
+	let ctxMenu = $state<{ x: number; y: number; items: CtxItem[] } | null>(null);
+
+	function closeCtx() { ctxMenu = null; }
+
+	function showNodeContext(e: MouseEvent, node: TreeNode) {
+		e.preventDefault();
+		e.stopPropagation();
+		tree.select(node.id);
+		const isFolder = node.type === 'folder';
+		const isExpanded = isFolder && tree.expanded.has(node.id);
+		const items: CtxItem[] = [];
+		if (!isFolder) {
+			items.push({ label: 'Open', icon: 'open_in_new', action: () => { closeCtx(); onfileopen?.(node); } });
+			items.push({ separator: true });
+		}
+		if (isFolder) {
+			items.push({ label: 'New File', icon: 'note_add', action: () => { closeCtx(); tree.addFile(node.id); } });
+			items.push({ label: 'New Folder', icon: 'create_new_folder', action: () => { closeCtx(); tree.addFolder(node.id); } });
+			items.push({ separator: true });
+			items.push({ label: isExpanded ? 'Collapse' : 'Expand', icon: isExpanded ? 'unfold_less' : 'unfold_more', action: () => { closeCtx(); tree.toggle(node.id); } });
+			items.push({ separator: true });
+		}
+		items.push({ label: 'Rename', icon: 'edit', action: () => { closeCtx(); tree.startRename(node.id); } });
+		items.push({ label: 'Copy Path', icon: 'content_copy', action: () => { closeCtx(); (oncopypath ?? ((p) => navigator.clipboard.writeText(p)))(node.id); } });
+		items.push({ separator: true });
+		items.push({ label: 'Delete', icon: 'delete', action: () => { closeCtx(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); } });
+		ctxMenu = { x: e.clientX, y: e.clientY, items };
+	}
+
+	function showBlankContext(e: MouseEvent) {
+		e.preventDefault();
+		const items: CtxItem[] = [
+			{ label: 'New File', icon: 'note_add', action: () => { closeCtx(); tree.addFile(); } },
+			{ label: 'New Folder', icon: 'create_new_folder', action: () => { closeCtx(); tree.addFolder(); } },
+		];
+		if (onsetroot) {
+			items.push({ separator: true });
+			items.push({ label: 'Open Folder', icon: 'folder_open', action: () => { closeCtx(); onsetroot!(); } });
+		}
+		if (tree.flatRows.length > 0) {
+			items.push({ separator: true });
+			items.push({ label: 'Collapse All', icon: 'unfold_less', action: () => { closeCtx(); tree.collapseAll(); } });
+		}
+		ctxMenu = { x: e.clientX, y: e.clientY, items };
+	}
+
+	$effect(() => {
+		if (!ctxMenu) return;
+		function onClick() { ctxMenu = null; }
+		document.addEventListener('click', onClick, true);
+		return () => document.removeEventListener('click', onClick, true);
+	});
 </script>
 
 <svelte:window onpointermove={onPointerMove} onpointerup={onPointerUp} onresize={measure} />
@@ -250,66 +293,69 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <div
-	class="flex flex-col h-full bg-neutral-900 text-neutral-200 select-none overflow-hidden"
-	style="width:{width}px;"
+	class="jte-treeview flex flex-col h-full select-none overflow-hidden"
+	data-theme={theme}
 	role="tree"
 	onkeydown={onKeydown}
 >
-	<!-- Header (VSCode-style) -->
+	<!-- Header -->
 	<div class="flex items-center h-8 px-2 py-1.5 shrink-0 group/hdr gap-1.5">
-		<span class="material-symbols-outlined text-[18px] text-yellow-500/70 shrink-0">folder</span>
-		{#if editingRoot}
-			<input
-				class="flex-1 min-w-0 bg-neutral-800 text-[13px] text-neutral-100 px-1.5 h-6 rounded outline-none border border-blue-500/60"
-				bind:value={rootInput}
-				use:autoFocus
-				onblur={commitRoot}
-			/>
-		{:else}
-			<span class="text-[13px] font-medium text-neutral-200 truncate flex-1 min-w-0">{tree.root}</span>
-			<div class="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
+		<span class="material-symbols-outlined text-[18px] jte-tv-folder-icon shrink-0">folder</span>
+		<span class="text-[13px] font-medium jte-tv-text truncate flex-1 min-w-0">{tree.root}</span>
+		<div class="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
+			{#if onsetroot}
 				<button
-					class="p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-neutral-200"
-					title="Set root"
-					onclick={startEditRoot}
+					class="p-0.5 rounded jte-tv-btn"
+					title="Open folder"
+					onclick={() => onsetroot?.()}
 				>
-					<span class="material-symbols-outlined text-[16px]">edit</span>
+					<span class="material-symbols-outlined text-[16px]">folder_open</span>
 				</button>
-				<button
-					class="p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-neutral-200"
-					title="New File"
-					onclick={() => tree.addFile()}
-				>
-					<span class="material-symbols-outlined text-[16px]">note_add</span>
-				</button>
-				<button
-					class="p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-neutral-200"
-					title="New Folder"
-					onclick={() => tree.addFolder()}
-				>
-					<span class="material-symbols-outlined text-[16px]">create_new_folder</span>
-				</button>
-				<button
-					class="p-0.5 rounded hover:bg-white/10 text-neutral-500 hover:text-neutral-200"
-					title="Collapse All"
-					onclick={() => tree.collapseAll()}
-				>
-					<span class="material-symbols-outlined text-[16px]">unfold_less</span>
-				</button>
-			</div>
-		{/if}
+			{/if}
+			<button
+				class="p-0.5 rounded jte-tv-btn"
+				title="New File"
+				onclick={() => tree.addFile()}
+			>
+				<span class="material-symbols-outlined text-[16px]">note_add</span>
+			</button>
+			<button
+				class="p-0.5 rounded jte-tv-btn"
+				title="New Folder"
+				onclick={() => tree.addFolder()}
+			>
+				<span class="material-symbols-outlined text-[16px]">create_new_folder</span>
+			</button>
+			<button
+				class="p-0.5 rounded jte-tv-btn"
+				title="Collapse All"
+				onclick={() => tree.collapseAll()}
+			>
+				<span class="material-symbols-outlined text-[16px]">unfold_less</span>
+			</button>
+		</div>
 	</div>
 
 	<!-- Tree body (virtualized) -->
 	<div
-		class="flex-1 overflow-y-auto overflow-x-hidden"
+		class="flex-1 overflow-y-auto overflow-x-hidden m-2"
 		data-tree-body
 		bind:this={scrollEl}
 		onscroll={onScroll}
+		oncontextmenu={showBlankContext}
 	>
 		{#if tree.flatRows.length === 0}
-			<div class="text-[11px] text-neutral-600 px-3 py-6 text-center">
-				No files yet
+			<div class="flex flex-col items-center justify-center gap-3 px-3 py-8">
+				{#if onsetroot}
+					<button
+						class="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] jte-tv-open-btn"
+						onclick={() => onsetroot?.()}
+					>
+						<span class="material-symbols-outlined text-[16px]">folder_open</span>
+						Open Folder
+					</button>
+				{/if}
+				<span class="text-[11px] jte-tv-muted">No files yet</span>
 			</div>
 		{:else}
 			<div style="height:{virt.totalH}px; position:relative;">
@@ -338,8 +384,8 @@
 	<button
 		type="button"
 		data-node-id={node.id}
-		class="jte-tree-row flex items-center h-7 pr-1.5 cursor-pointer group w-full text-left gap-0.5
-			{isSelected ? 'bg-blue-500/20 text-neutral-100' : 'hover:bg-white/4 text-neutral-300'}
+		class="jte-tree-row flex items-center h-7 pr-1.5 cursor-pointer w-full text-left gap-0.5
+			{isSelected ? 'jte-tv-row-selected' : 'jte-tv-row'}
 			{isDragSource ? 'opacity-40' : ''}
 			{isDropHere && dropTarget?.valid ? 'bg-blue-500/15 outline-1 outline-blue-400/50' : ''}
 			{isDropHere && !dropTarget?.valid ? 'bg-red-500/10 outline-1 outline-red-400/30' : ''}"
@@ -347,6 +393,7 @@
 		onclick={() => { tree.select(node.id); if (isFolder) tree.toggle(node.id); }}
 		ondblclick={() => { if (!isFolder && onfileopen) onfileopen(node); }}
 		onpointerdown={(e: PointerEvent) => { if (e.button === 0) onDragStart(e, node.id); }}
+		oncontextmenu={(e: MouseEvent) => showNodeContext(e, node)}
 	>
 		<!-- Chevron -->
 		<span
@@ -362,7 +409,7 @@
 		>
 			{#if isFolder}
 				<span
-					class="material-symbols-outlined text-[16px] text-neutral-500 transition-transform duration-100
+					class="material-symbols-outlined text-[16px] jte-tv-chevron transition-transform duration-100
 						{isExpanded ? 'rotate-90' : ''}"
 				>chevron_right</span>
 			{/if}
@@ -370,8 +417,8 @@
 
 		<!-- Icon -->
 		{#if isFolder}
-			<span class="material-symbols-outlined text-[18px] mr-1.5 shrink-0
-				{isExpanded ? 'text-yellow-400/80' : 'text-yellow-500/60'}">
+			<span class="material-symbols-outlined text-[18px] mr-1.5 shrink-0 jte-tv-folder-icon
+				{isExpanded ? 'jte-tv-folder-open' : ''}">
 				{isExpanded ? 'folder_open' : 'folder'}
 			</span>
 		{:else}
@@ -383,7 +430,7 @@
 		<!-- Name / edit input -->
 		{#if isEditing}
 			<input
-				class="flex-1 min-w-0 bg-neutral-800 text-[13px] text-neutral-100 px-1 rounded outline-none
+				class="jte-tv-edit-input flex-1 min-w-0 text-[13px] px-1 rounded outline-none
 					border border-blue-500/60 h-5.5 -my-px"
 				bind:value={tree.editValue}
 				use:autoFocus
@@ -394,7 +441,7 @@
 		{:else}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<span
-				class="text-[13px] truncate flex-1 min-w-0 {node.name ? '' : 'italic text-neutral-600'}"
+				class="text-[13px] truncate flex-1 min-w-0 {node.name ? '' : 'italic jte-tv-muted'}"
 				ondblclick={(e: MouseEvent) => {
 					e.stopPropagation();
 					if (!isFolder && onfileopen) onfileopen(node);
@@ -403,28 +450,112 @@
 			>
 				{node.name || '(new)'}
 			</span>
-			<span
-				role="button"
-				tabindex="-1"
-				class="p-0.5 rounded shrink-0 opacity-0 group-hover:opacity-50 hover:opacity-100!
-					hover:bg-white/10 text-neutral-400 cursor-pointer"
-				title="Delete"
-				onclick={(e: MouseEvent) => { e.stopPropagation(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); }}
-				onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') { e.stopPropagation(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); } }}
-			>
-				<span class="material-symbols-outlined text-[14px]">close</span>
-			</span>
 		{/if}
 	</button>
 {/snippet}
 
+<!-- Context menu -->
+{#if ctxMenu}
+	<div
+		class="jte-tv-ctx fixed z-50"
+		style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+	>
+		{#each ctxMenu.items as item}
+			{#if item.separator}
+				<div class="jte-tv-ctx-sep"></div>
+			{:else}
+				<button class="jte-tv-ctx-item" onclick={item.action}>
+					<span class="material-symbols-outlined text-[16px]">{item.icon}</span>
+					{item.label}
+				</button>
+			{/if}
+		{/each}
+	</div>
+{/if}
+
 <style>
-	/* material-file-icons SVGs declare style="width:100%;height:100%".
-	   Hard-clamp them to their wrapper so a missing size class can never
-	   let them balloon to intrinsic size. */
 	.jte-file-icon :global(svg) {
 		width: 100%;
 		height: 100%;
 		display: block;
+	}
+
+	/* --- Theme: dark (default) --- */
+	.jte-treeview {
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-text { color: var(--jte-fg, #d4d4d4); }
+	.jte-tv-muted { color: var(--jte-status-fg, #666); }
+	.jte-tv-chevron { color: var(--jte-status-fg, #777); }
+	.jte-tv-folder-icon { color: #d4a050; opacity: 0.6; }
+	.jte-tv-folder-open { opacity: 0.8; }
+	.jte-tv-btn {
+		background: transparent;
+		border: none;
+		color: var(--jte-status-fg, #777);
+		cursor: pointer;
+	}
+	.jte-tv-btn:hover {
+		background: var(--jte-toolbar-hover, rgba(255,255,255,0.1));
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-row {
+		background: transparent;
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-row:hover {
+		background: var(--jte-toolbar-hover, rgba(255,255,255,0.04));
+	}
+	.jte-tv-row-selected {
+		background: rgba(59, 130, 246, 0.2);
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-edit-input {
+		background: var(--jte-input-bg, #1e1e1e);
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-open-btn {
+		background: var(--jte-toolbar-hover, rgba(255,255,255,0.06));
+		border: 1px solid var(--jte-border, #3a3a3a);
+		color: var(--jte-fg, #d4d4d4);
+		cursor: pointer;
+	}
+	.jte-tv-open-btn:hover {
+		background: var(--jte-toolbar-hover, rgba(255,255,255,0.1));
+		border-color: var(--jte-accent, #569cd6);
+	}
+
+	/* --- Context menu --- */
+	.jte-tv-ctx {
+		min-width: 160px;
+		background: var(--jte-menubar-bg, #252525);
+		border: 1px solid var(--jte-border, #3a3a3a);
+		border-radius: 6px;
+		padding: 4px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	}
+	.jte-tv-ctx-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 5px 8px;
+		background: transparent;
+		border: none;
+		color: var(--jte-toolbar-fg, #ccc);
+		cursor: pointer;
+		font-family: var(--jte-ui-font, system-ui, sans-serif);
+		font-size: 12px;
+		text-align: left;
+		border-radius: 4px;
+		white-space: nowrap;
+	}
+	.jte-tv-ctx-item:hover {
+		background: var(--jte-toolbar-hover, #333);
+	}
+	.jte-tv-ctx-sep {
+		height: 1px;
+		background: var(--jte-border, #333);
+		margin: 4px 0;
 	}
 </style>

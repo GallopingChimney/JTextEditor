@@ -6,6 +6,7 @@
     import RichTextEditor from "./RichTextEditor.svelte";
     import Settings from "./Settings.svelte";
     import TreeView from "./tree/TreeView.svelte";
+    import EdgePanel from "./EdgePanel.svelte";
     import { detectLineEnding, splitLines } from "./lib/characters.js";
     import { languages } from "./lib/languages.js";
     import { detectIndent } from "./lib/cm-setup.js";
@@ -32,6 +33,7 @@
         tree = undefined,
         onfileopen = undefined,
         onrequestdelete = undefined,
+        onsetroot = undefined,
     } = $props();
 
     let nextId = $state(1);
@@ -59,6 +61,7 @@
     let _lineHeight = $state("");
     let _defaultMode = $state("rich");
     let _toolbarMode = $state("pinned");
+    let _zoom = $state(1);
 
     // Sync internal state from external settings prop
     $effect(() => {
@@ -77,6 +80,7 @@
         if (settings.lineHeight != null) _lineHeight = settings.lineHeight;
         if (settings.defaultMode != null) _defaultMode = settings.defaultMode;
         if (settings.toolbarMode != null) _toolbarMode = settings.toolbarMode;
+        if (settings.zoom != null) _zoom = settings.zoom;
     });
 
     // Derived values for reactivity in template
@@ -95,6 +99,7 @@
     let lineHeight = $derived(_lineHeight);
     let defaultMode = $derived(_defaultMode);
     let toolbarMode = $derived(_toolbarMode);
+    let zoom = $derived(_zoom);
     let cursorLine = $state(1);
     let cursorCol = $state(1);
     let indentLabel = $state("Spaces: 4");
@@ -110,36 +115,6 @@
     let settingsOpen = $state(false);
     let treeOpen = $state(true);
     let treeWidth = $state(240);
-    const TREE_MIN_W = 42;
-    const TREE_MAX_W = 520;
-    const TREE_SNAP_CLOSE = 30;
-    let treeResizing = $state(false);
-    let treeResizeStartX = 0;
-    let treeResizeStartW = 0;
-
-    function onTreeResizeDown(e) {
-        e.preventDefault();
-        treeResizing = true;
-        treeResizeStartX = e.clientX;
-        treeResizeStartW = treeWidth;
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-    }
-    function onTreeResizeMove(e) {
-        if (!treeResizing) return;
-        const target = treeResizeStartW + e.clientX - treeResizeStartX;
-        if (target < TREE_SNAP_CLOSE) {
-            treeOpen = false;
-            treeWidth = 240;
-            treeResizing = false;
-            return;
-        }
-        treeWidth = Math.max(TREE_MIN_W, Math.min(TREE_MAX_W, target));
-    }
-    function onTreeResizeUp() {
-        treeResizing = false;
-    }
-
-
 
     let lineEnding = $derived(
         activeTab ? detectLineEnding(activeTab.content) : "lf",
@@ -196,7 +171,7 @@
     }
 
     function notifySettings() {
-        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, showIndentGuides, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, defaultMode, toolbarMode });
+        onsettingschange?.({ showInvisibles, showLineNumbers, wordWrap, highlightLine, showIndentGuides, theme, pageWidth, bgColor, pageColor, fontFamily, fontSize, tabSize, lineHeight, defaultMode, toolbarMode, zoom });
     }
 
     function handleRename(newName) {
@@ -287,6 +262,29 @@
         }
     }
 
+    // Ctrl+Scroll zoom: code mode adjusts CSS font-size (CodeMirror reads
+    // --jte-font-size); rich mode adjusts CSS zoom on the rich container so
+    // inline font-size marks scale proportionally with the document.
+    function handleWheel(e) {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        const dir = e.deltaY < 0 ? 1 : -1;
+        if (isPlainMode) {
+            const cur = parseInt(_fontSize, 10) || 14;
+            const next = Math.max(8, Math.min(72, cur + dir));
+            if (next !== cur) {
+                _fontSize = `${next}px`;
+                notifySettings();
+            }
+        } else {
+            const next = Math.max(0.5, Math.min(3, Math.round((_zoom + dir * 0.1) * 10) / 10));
+            if (next !== _zoom) {
+                _zoom = next;
+                notifySettings();
+            }
+        }
+    }
+
     function handleKeydown(e) {
         const mod = e.ctrlKey || e.metaKey;
         if (mod && e.key === "s") {
@@ -359,12 +357,13 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="jte-root" data-theme={theme} onkeydown={handleKeydown}
+<div class="jte-root" data-theme={theme} onkeydown={handleKeydown} onwheel={handleWheel}
     style:--jte-bg={(isPlainMode ? bgColor : (pageWidth === 'full' ? pageColor : bgColor)) || null}
     style:--jte-page-canvas={bgColor || null}
     style:--jte-page-color={(!isPlainMode && pageWidth !== 'full' ? pageColor : null) || null}
     style:--jte-font={fontFamily || null}
     style:--jte-font-size={fontSize || null}
+    style:--jte-zoom={zoom}
     style:--jte-line-height={lineHeight || null}>
     {#if activeTab}
         <TopBar
@@ -386,18 +385,24 @@
         />
 
         <div class="jte-editor-wrap">
-            {#if tree && treeOpen}
-                <div class="jte-tree-sidebar" style="width:{treeWidth}px;">
-                    <TreeView {tree} width={treeWidth} {onfileopen} {onrequestdelete} />
-                </div>
-                <div
-                    class="jte-tree-resize"
-                    class:jte-tree-resize-active={treeResizing}
-                    role="separator"
-                    onpointerdown={onTreeResizeDown}
-                    onpointermove={onTreeResizeMove}
-                    onpointerup={onTreeResizeUp}
-                ></div>
+            {#if tree}
+                <EdgePanel
+                    edge="left"
+                    mode="push"
+                    styled
+                    collapsedType="hidden"
+                    bind:open={treeOpen}
+                    bind:size={treeWidth}
+                    min={42}
+                    max={520}
+                    snapAt={42}
+                    handleHitSize={7}
+                    hintHitSize={14}
+                >
+                    <div class="jte-tree-sidebar">
+                        <TreeView {tree} width={treeWidth} theme={_theme} {onfileopen} {onrequestdelete} {onsetroot} />
+                    </div>
+                </EdgePanel>
             {/if}
             <div class="jte-editor-main">
                 {#if isPlainMode}
@@ -576,25 +581,10 @@
     }
 
     .jte-tree-sidebar {
-        flex-shrink: 0;
-        border-right: 1px solid var(--jte-border, #333);
+        width: 100%;
+        height: 100%;
         overflow: hidden;
         background: var(--jte-bg, #272727);
-    }
-
-    .jte-tree-resize {
-        width: 4px;
-        margin-left: -2px;
-        margin-right: -2px;
-        flex-shrink: 0;
-        cursor: col-resize;
-        background: transparent;
-        transition: background 0.12s;
-        z-index: 5;
-    }
-    .jte-tree-resize:hover,
-    .jte-tree-resize-active {
-        background: rgba(59, 130, 246, 0.35);
     }
 
     .jte-settings-sidebar {

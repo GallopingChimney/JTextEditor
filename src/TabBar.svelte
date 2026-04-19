@@ -75,7 +75,7 @@
     .jte-tab-pill.active {
         background: var(--jte-toolbar-hover, #333);
         border-bottom: 2px solid var(--jte-accent, #569cd6);
-        color: #fff;
+        color: var(--jte-fg, #d4d4d4);
     }
 
     .jte-tab-dirty {
