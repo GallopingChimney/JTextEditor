@@ -224,7 +224,7 @@
     justify-content: space-between;
     padding: 3px 6px;
     background: var(--jte-menubar-bg, );
-    border-bottom: 1px solid var(--jte-border, #272727);
+    border-bottom: 1px solid color-mix(in srgb, var(--jte-border, #272727) 40%, transparent);
     flex-shrink: 0;
     user-select: none;
   }
@@ -378,7 +378,7 @@
     top: calc(100% + 4px);
     right: 0;
     min-width: 160px;
-    background: var(--jte-menubar-bg, #252525);
+    background: var(--jte-menubar-bg, #373737);
     border: 1px solid var(--jte-border, #3a3a3a);
     border-radius: 6px;
     padding: 4px;

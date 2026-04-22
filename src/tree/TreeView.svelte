@@ -6,12 +6,16 @@
 
 	let {
 		tree,
-		width = 240,
+		width = 144,
 		theme = 'dark',
 		onfileopen,
 		onrequestdelete,
 		onsetroot,
+		onsetrootpath,
 		oncopypath,
+		onsearch,
+		onreveal,
+		onterminal,
 	}: {
 		tree: TreeState;
 		width?: number;
@@ -19,7 +23,11 @@
 		onfileopen?: (node: TreeNode) => void;
 		onrequestdelete?: (node: TreeNode) => void;
 		onsetroot?: () => void;
+		onsetrootpath?: (path: string) => void;
 		oncopypath?: (path: string) => void;
+		onsearch?: (query: string) => Promise<string[]>;
+		onreveal?: (path: string) => void;
+		onterminal?: (path: string) => void;
 	} = $props();
 
 	// --- File icons (extensible) ---
@@ -37,6 +45,81 @@
 	function autoFocus(el: HTMLInputElement) {
 		setTimeout(() => { el.focus(); el.select(); }, 0);
 	}
+
+	// --- Search ---
+
+	let searchOpen = $state(false);
+	let searchQuery = $state('');
+	let searchResults = $state<string[]>([]);
+	let searchLoading = $state(false);
+	let _searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function openSearch() {
+		if (!onsearch) return;
+		searchOpen = true;
+		searchQuery = '';
+		searchResults = [];
+	}
+
+	function closeSearch() {
+		searchOpen = false;
+		searchQuery = '';
+		searchResults = [];
+		searchLoading = false;
+		if (_searchTimer) { clearTimeout(_searchTimer); _searchTimer = null; }
+	}
+
+	function onSearchInput(value: string) {
+		searchQuery = value;
+		if (_searchTimer) clearTimeout(_searchTimer);
+		if (!value.trim()) {
+			searchResults = [];
+			searchLoading = false;
+			return;
+		}
+		searchLoading = true;
+		_searchTimer = setTimeout(async () => {
+			if (!onsearch) return;
+			try {
+				const results = await onsearch(value.trim());
+				if (searchQuery.trim() === value.trim()) {
+					searchResults = results;
+				}
+			} catch {
+				searchResults = [];
+			} finally {
+				searchLoading = false;
+			}
+		}, 200);
+	}
+
+	function onSearchFileOpen(relPath: string) {
+		const node: TreeNode = {
+			id: relPath,
+			name: relPath.split(/[\\/]/).pop() ?? relPath,
+			type: 'file',
+			children: [],
+		};
+		onfileopen?.(node);
+		closeSearch();
+	}
+
+	function onSearchKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			e.stopPropagation();
+			closeSearch();
+		}
+	}
+
+	// Search virtualization
+	const searchVirt = $derived.by(() => {
+		const count = searchResults.length;
+		const totalH = count * rowH;
+		const start = Math.max(0, Math.floor(scrollTop / rowH) - OVERSCAN);
+		const end = Math.min(count, Math.ceil((scrollTop + viewportH) / rowH) + OVERSCAN + 1);
+		return { start, end, offsetY: start * rowH, totalH };
+	});
 
 	// --- Virtualization ---
 
@@ -209,8 +292,29 @@
 		| { separator: true };
 
 	let ctxMenu = $state<{ x: number; y: number; items: CtxItem[] } | null>(null);
+	let treeEl: HTMLDivElement | undefined = $state();
+
+	function clampCtxMenu(el: HTMLElement) {
+		if (!treeEl) return;
+		const panel = treeEl.getBoundingClientRect();
+		const menu = el.getBoundingClientRect();
+		if (menu.bottom > panel.bottom) {
+			el.style.top = `${Math.max(panel.top, panel.bottom - menu.height)}px`;
+		}
+		if (menu.right > panel.right) {
+			el.style.left = `${Math.max(panel.left, panel.right - menu.width)}px`;
+		}
+	}
 
 	function closeCtx() { ctxMenu = null; }
+
+	function relativePath(absPath: string): string {
+		const firstNode = tree.nodes[0];
+		if (!firstNode) return absPath;
+		const rootDir = firstNode.id.replace(/[\\/][^\\/]+$/, '');
+		if (!rootDir || !absPath.startsWith(rootDir)) return absPath;
+		return absPath.slice(rootDir.length + 1);
+	}
 
 	function showNodeContext(e: MouseEvent, node: TreeNode) {
 		e.preventDefault();
@@ -231,7 +335,20 @@
 			items.push({ separator: true });
 		}
 		items.push({ label: 'Rename', icon: 'edit', action: () => { closeCtx(); tree.startRename(node.id); } });
-		items.push({ label: 'Copy Path', icon: 'content_copy', action: () => { closeCtx(); (oncopypath ?? ((p) => navigator.clipboard.writeText(p)))(node.id); } });
+		items.push({ separator: true });
+		items.push({ label: 'Copy Path', icon: 'content_copy', action: () => { closeCtx(); navigator.clipboard.writeText(node.id); } });
+		items.push({ label: 'Copy Relative Path', icon: 'content_copy', action: () => { closeCtx(); navigator.clipboard.writeText(relativePath(node.id)); } });
+		if (onreveal) {
+			items.push({ label: 'Reveal in Explorer', icon: 'folder_open', action: () => { closeCtx(); onreveal!(node.id); } });
+		}
+		if (onterminal) {
+			const termPath = isFolder ? node.id : node.id.replace(/[\\/][^\\/]+$/, '');
+			items.push({ label: 'Open in Terminal', icon: 'terminal', action: () => { closeCtx(); onterminal!(termPath); } });
+		}
+		if (isFolder && onsetrootpath) {
+			items.push({ separator: true });
+			items.push({ label: 'Set as Root', icon: 'drive_file_move', action: () => { closeCtx(); onsetrootpath!(node.id); } });
+		}
 		items.push({ separator: true });
 		items.push({ label: 'Delete', icon: 'delete', action: () => { closeCtx(); (onrequestdelete ?? ((n) => tree.remove(n.id)))(node); } });
 		ctxMenu = { x: e.clientX, y: e.clientY, items };
@@ -297,54 +414,87 @@
 	data-theme={theme}
 	role="tree"
 	onkeydown={onKeydown}
+	bind:this={treeEl}
 >
-	<!-- Header -->
-	<div class="flex items-center h-8 px-2 py-1.5 shrink-0 group/hdr gap-1.5">
-		<span class="material-symbols-outlined text-[18px] jte-tv-folder-icon shrink-0">folder</span>
-		<span class="text-[13px] font-medium jte-tv-text truncate flex-1 min-w-0">{tree.root}</span>
-		<div class="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
-			{#if onsetroot}
-				<button
-					class="p-0.5 rounded jte-tv-btn"
-					title="Open folder"
-					onclick={() => onsetroot?.()}
-				>
-					<span class="material-symbols-outlined text-[16px]">folder_open</span>
-				</button>
-			{/if}
-			<button
-				class="p-0.5 rounded jte-tv-btn"
-				title="New File"
-				onclick={() => tree.addFile()}
-			>
-				<span class="material-symbols-outlined text-[16px]">note_add</span>
+	<!-- Toolbar -->
+	<div class="flex items-center px-2 pt-1.5 pb-0.5 shrink-0 gap-0.5">
+		{#if onsearch}
+			<button class="p-0.5 rounded jte-tv-btn" title="Search files" onclick={openSearch}>
+				<span class="material-symbols-outlined text-[16px]">search</span>
 			</button>
-			<button
-				class="p-0.5 rounded jte-tv-btn"
-				title="New Folder"
-				onclick={() => tree.addFolder()}
-			>
-				<span class="material-symbols-outlined text-[16px]">create_new_folder</span>
+		{/if}
+		{#if onsetroot}
+			<button class="p-0.5 rounded jte-tv-btn" title="Open folder" onclick={() => onsetroot?.()}>
+				<span class="material-symbols-outlined text-[16px]">folder_open</span>
 			</button>
-			<button
-				class="p-0.5 rounded jte-tv-btn"
-				title="Collapse All"
-				onclick={() => tree.collapseAll()}
-			>
-				<span class="material-symbols-outlined text-[16px]">unfold_less</span>
-			</button>
-		</div>
+		{/if}
+		<button class="p-0.5 rounded jte-tv-btn" title="New File" onclick={() => tree.addFile()}>
+			<span class="material-symbols-outlined text-[16px]">note_add</span>
+		</button>
+		<button class="p-0.5 rounded jte-tv-btn" title="New Folder" onclick={() => tree.addFolder()}>
+			<span class="material-symbols-outlined text-[16px]">create_new_folder</span>
+		</button>
+		<button class="p-0.5 rounded jte-tv-btn" title="Collapse All" onclick={() => tree.collapseAll()}>
+			<span class="material-symbols-outlined text-[16px]">unfold_less</span>
+		</button>
 	</div>
 
-	<!-- Tree body (virtualized) -->
+	<!-- Root label -->
+	{#if tree.root && tree.root !== 'Untitled'}
+		<div class="flex items-center h-6 px-2 pb-0.5 shrink-0 gap-1.5">
+			<span class="material-symbols-outlined text-[16px] jte-tv-folder-icon shrink-0">folder</span>
+			<span class="text-[12px] font-medium jte-tv-text truncate flex-1 min-w-0">{tree.root}</span>
+		</div>
+	{/if}
+
+	<!-- Search bar -->
+	{#if searchOpen}
+		<div class="flex items-center gap-1 px-2 pb-1 shrink-0">
+			<span class="material-symbols-outlined text-[14px] jte-tv-muted shrink-0">search</span>
+			<input
+				class="jte-tv-search-input flex-1 min-w-0 text-[12px] px-1.5 py-0.5 rounded outline-none border border-transparent focus:border-blue-500/60"
+				placeholder="Search files…"
+				bind:value={searchQuery}
+				oninput={(e: Event) => onSearchInput((e.currentTarget as HTMLInputElement).value)}
+				onkeydown={onSearchKeydown}
+				use:autoFocus
+			/>
+			{#if searchLoading}
+				<span class="material-symbols-outlined text-[14px] jte-tv-muted shrink-0 animate-spin">progress_activity</span>
+			{/if}
+			<button
+				class="p-0.5 rounded jte-tv-btn shrink-0"
+				title="Close search"
+				onclick={closeSearch}
+			>
+				<span class="material-symbols-outlined text-[14px]">close</span>
+			</button>
+		</div>
+	{/if}
+
+	<!-- Tree body / search results (virtualized) -->
 	<div
 		class="flex-1 overflow-y-auto overflow-x-hidden m-2"
 		data-tree-body
 		bind:this={scrollEl}
 		onscroll={onScroll}
-		oncontextmenu={showBlankContext}
+		oncontextmenu={searchOpen ? undefined : showBlankContext}
 	>
-		{#if tree.flatRows.length === 0}
+		{#if searchOpen}
+			{#if searchQuery.trim() && searchResults.length === 0 && !searchLoading}
+				<div class="flex flex-col items-center justify-center px-3 py-6">
+					<span class="text-[11px] jte-tv-muted">No files found</span>
+				</div>
+			{:else if searchResults.length > 0}
+				<div style="height:{searchVirt.totalH}px; position:relative;">
+					<div style="transform:translateY({searchVirt.offsetY}px);">
+						{#each searchResults.slice(searchVirt.start, searchVirt.end) as fullPath (fullPath)}
+							{@render searchResultRow(fullPath)}
+						{/each}
+					</div>
+				</div>
+			{/if}
+		{:else if tree.flatRows.length === 0}
 			<div class="flex flex-col items-center justify-center gap-3 px-3 py-8">
 				{#if onsetroot}
 					<button
@@ -454,11 +604,35 @@
 	</button>
 {/snippet}
 
+<!-- ==================== Search result row ==================== -->
+
+{#snippet searchResultRow(relPath: string)}
+	{@const name = relPath.split(/[\\/]/).pop() ?? relPath}
+	{@const dir = relPath.includes('/') || relPath.includes('\\')
+		? relPath.slice(0, relPath.length - name.length - 1)
+		: ''}
+	<button
+		type="button"
+		class="jte-tree-row flex items-center h-7 pr-1.5 cursor-pointer w-full text-left gap-0.5 jte-tv-row"
+		style="padding-left: 6px;"
+		onclick={() => onSearchFileOpen(relPath)}
+	>
+		<span class="jte-file-icon w-5 h-5 mr-1.5 shrink-0 flex items-center justify-center">
+			{@html fileIconSvg(name)}
+		</span>
+		<span class="text-[13px] truncate flex-1 min-w-0">{name}</span>
+		{#if dir}
+			<span class="text-[11px] jte-tv-muted truncate ml-1 max-w-[40%]">{dir}</span>
+		{/if}
+	</button>
+{/snippet}
+
 <!-- Context menu -->
 {#if ctxMenu}
 	<div
 		class="jte-tv-ctx fixed z-50"
 		style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+		use:clampCtxMenu
 	>
 		{#each ctxMenu.items as item}
 			{#if item.separator}
@@ -523,6 +697,15 @@
 	.jte-tv-open-btn:hover {
 		background: var(--jte-toolbar-hover, rgba(255,255,255,0.1));
 		border-color: var(--jte-accent, #569cd6);
+	}
+
+	/* --- Search input --- */
+	.jte-tv-search-input {
+		background: var(--jte-input-bg, #1e1e1e);
+		color: var(--jte-fg, #d4d4d4);
+	}
+	.jte-tv-search-input::placeholder {
+		color: var(--jte-status-fg, #666);
 	}
 
 	/* --- Context menu --- */

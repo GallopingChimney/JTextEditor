@@ -6,7 +6,7 @@ import { tags } from "@lezer/highlight";
 export const jteTheme = EditorView.theme(
     {
         "&": {
-            backgroundColor: "var(--jte-bg, #1e1e1e)",
+            backgroundColor: "var(--jte-code-bg, var(--jte-bg, rgba(9, 9, 11, 0.3)))",
             color: "var(--jte-fg, #d4d4d4)",
             height: "100%",
             fontSize: "var(--jte-font-size, 14px)",
@@ -22,7 +22,7 @@ export const jteTheme = EditorView.theme(
             backgroundColor: "var(--jte-active-line, rgba(255, 255, 255, 0.04))",
         },
         ".cm-gutters": {
-            backgroundColor: "var(--jte-bg, #1e1e1e)",
+            backgroundColor: "var(--jte-gutter-bg, rgba(10, 10, 10, 0.37))",
             color: "var(--jte-gutter-fg, #555)",
             borderRight: "none",
             fontFamily:

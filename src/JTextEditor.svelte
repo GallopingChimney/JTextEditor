@@ -34,6 +34,10 @@
         onfileopen = undefined,
         onrequestdelete = undefined,
         onsetroot = undefined,
+        onsetrootpath = undefined,
+        onsearch = undefined,
+        onreveal = undefined,
+        onterminal = undefined,
     } = $props();
 
     let nextId = $state(1);
@@ -114,7 +118,7 @@
     let editorRef = $state();
     let settingsOpen = $state(false);
     let treeOpen = $state(true);
-    let treeWidth = $state(240);
+    let treeWidth = $state(144);
 
     let lineEnding = $derived(
         activeTab ? detectLineEnding(activeTab.content) : "lf",
@@ -359,6 +363,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="jte-root" data-theme={theme} onkeydown={handleKeydown} onwheel={handleWheel}
     style:--jte-bg={(isPlainMode ? bgColor : (pageWidth === 'full' ? pageColor : bgColor)) || null}
+    style:--jte-tree-bg={bgColor || null}
     style:--jte-page-canvas={bgColor || null}
     style:--jte-page-color={(!isPlainMode && pageWidth !== 'full' ? pageColor : null) || null}
     style:--jte-font={fontFamily || null}
@@ -400,7 +405,7 @@
                     hintHitSize={14}
                 >
                     <div class="jte-tree-sidebar">
-                        <TreeView {tree} width={treeWidth} theme={_theme} {onfileopen} {onrequestdelete} {onsetroot} />
+                        <TreeView {tree} width={treeWidth} theme={_theme} {onfileopen} {onrequestdelete} {onsetroot} {onsetrootpath} {onsearch} {onreveal} {onterminal} />
                     </div>
                 </EdgePanel>
             {/if}
@@ -536,6 +541,8 @@
         --jte-toolbar-hover: #e0e0e0;
         --jte-status-fg: #777;
         --jte-gutter-fg: #999;
+        --jte-gutter-bg: #f3f3f3;
+        --jte-code-bg: #ffffff;
         --jte-selection: rgba(0, 120, 215, 0.35);
         --jte-selection-focused: rgba(0, 120, 215, 0.5);
         --jte-active-line: rgba(0, 0, 0, 0.04);
@@ -584,13 +591,14 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: var(--jte-bg, #272727);
+        background: var(--jte-tree-bg, var(--jte-bg, #1e1e1e));
+        border-right: 1px solid color-mix(in srgb, var(--jte-border, #333) 40%, transparent);
     }
 
     .jte-settings-sidebar {
         width: 280px;
         flex-shrink: 0;
-        border-left: 1px solid var(--jte-border, #333);
+        border-left: 1px solid color-mix(in srgb, var(--jte-border, #333) 40%, transparent);
         overflow-y: auto;
     }
 
@@ -600,7 +608,7 @@
         justify-content: space-between;
         padding: 0px 8px 0px 0px;
         background: var(--jte-toolbar-bg, #1e1e1e);
-        border-top: 1px solid var(--jte-border, #333);
+        border-top: 1px solid color-mix(in srgb, var(--jte-border, #333) 40%, transparent);
         flex-shrink: 0;
         height: 24px;
         gap: 0px;
@@ -634,6 +642,8 @@
         cursor: pointer;
         outline: none;
         scrollbar-width: none;
+        border-radius: 7px !important
+        overflow: auto;
     }
 
     .jte-lang-select::-webkit-scrollbar {
@@ -645,7 +655,7 @@
     }
 
     .jte-lang-select option {
-        background: var(--jte-menubar-bg, #252525);
+        background: var(--jte-menubar-bg, #373737);
         color: var(--jte-toolbar-fg, #ccc);
     }
 
